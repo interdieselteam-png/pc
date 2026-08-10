@@ -309,6 +309,11 @@
       <button id="btnIn" class="in">Money In</button>
     </div>
 
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="fDate">
+    </div>
+
     <div class="field amount-row">
       <span class="currency">KSh</span>
       <input type="number" id="fAmount" inputmode="decimal" placeholder="0.00" step="0.01">
@@ -467,6 +472,22 @@ function fmt(n){
   return sign + 'KSh ' + amount;
 }
 
+function dateStrFromTs(ts){
+  const d = new Date(ts);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Combines the picked date (from the Date field) with the time-of-day from
+// timeSource, so entries keep a stable created-order within the same day
+// instead of all landing at midnight.
+function combineDateAndTime(dateStr, timeSource){
+  const t = new Date(timeSource);
+  if(!dateStr) return t.getTime();
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d, t.getHours(), t.getMinutes(), t.getSeconds(), t.getMilliseconds()).getTime();
+}
+
 function render(){
   let balance = 0;
   let inCount = 0, outCount = 0;
@@ -544,6 +565,7 @@ function resetForm(){
   document.getElementById('fAmount').value = '';
   document.getElementById('fParty').value = '';
   document.getElementById('fNote').value = '';
+  document.getElementById('fDate').value = dateStrFromTs(Date.now());
   clearPendingReceipt();
   editingId = null;
   btnSave.textContent = 'Save Entry';
@@ -561,6 +583,7 @@ function startEdit(id){
   fSource.value = entry.source;
   document.getElementById('fParty').value = entry.party;
   document.getElementById('fNote').value = entry.note;
+  document.getElementById('fDate').value = dateStrFromTs(entry.ts);
 
   if(entry.receipt){
     pendingReceipt = entry.receipt;
@@ -589,6 +612,7 @@ document.getElementById('btnSave').addEventListener('click', () => {
   const source = fSource.value;
   const party = document.getElementById('fParty').value.trim();
   const note = document.getElementById('fNote').value.trim();
+  const dateStr = document.getElementById('fDate').value;
 
   if(!amount || amount <= 0){
     showToast('Enter a valid amount');
@@ -602,7 +626,8 @@ document.getElementById('btnSave').addEventListener('click', () => {
       return;
     }
     const original = entries[idx];
-    entries[idx] = { ...original, type: currentType, amount, source, party, note, receipt: pendingReceipt };
+    const ts = combineDateAndTime(dateStr, original.ts);
+    entries[idx] = { ...original, type: currentType, amount, source, party, note, receipt: pendingReceipt, ts };
 
     if(!saveEntries()){
       entries[idx] = original;
@@ -625,7 +650,7 @@ document.getElementById('btnSave').addEventListener('click', () => {
     party,
     note,
     receipt: pendingReceipt,
-    ts: Date.now()
+    ts: combineDateAndTime(dateStr, Date.now())
   });
 
   if(!saveEntries()){
@@ -925,7 +950,7 @@ async function syncAllToSheet(){
   const chronological = [...entries].sort((a,b) => a.ts - b.ts);
   const rows = chronological.map(e => [
     e.id,
-    new Date(e.ts).toISOString().slice(0,10),
+    dateStrFromTs(e.ts),
     e.type === 'in' ? 'Money In' : 'Money Out',
     e.amount.toFixed(2),
     e.source,
@@ -979,7 +1004,7 @@ document.getElementById('btnExport').addEventListener('click', () => {
   const rows = [['Date','Type','Amount','Category/Source','Party','Note']];
   [...entries].sort((a,b) => a.ts - b.ts).forEach(e => {
     rows.push([
-      new Date(e.ts).toISOString().slice(0,10),
+      dateStrFromTs(e.ts),
       e.type === 'in' ? 'Money In' : 'Money Out',
       e.amount.toFixed(2),
       e.source,
@@ -1017,7 +1042,7 @@ document.getElementById('btnExportPdf').addEventListener('click', () => {
   const tbody = document.getElementById('printTableBody');
   tbody.innerHTML = chronological.map(e => `
     <tr>
-      <td>${new Date(e.ts).toISOString().slice(0,10)}</td>
+      <td>${dateStrFromTs(e.ts)}</td>
       <td>${e.type === 'in' ? 'Money In' : 'Money Out'}</td>
       <td>${fmt(e.amount)}</td>
       <td>${escapeHtml(e.source)}</td>
@@ -1030,6 +1055,7 @@ document.getElementById('btnExportPdf').addEventListener('click', () => {
 });
 
 setType('out');
+document.getElementById('fDate').value = dateStrFromTs(Date.now());
 loadEntries();
 
 if('serviceWorker' in navigator){
