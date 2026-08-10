@@ -169,12 +169,25 @@
     width:34px;height:34px;object-fit:cover;border:1px solid var(--rule);
     border-radius:2px;cursor:pointer;flex-shrink:0;
   }
-  .delete-btn{
-    background:none;border:none;color:var(--ink-soft);cursor:pointer;
-    font-size:18px;line-height:1;padding:2px 4px;font-family:ui-monospace,monospace;
-    align-self:start;
+  .entry-actions{
+    display:flex;gap:2px;align-self:start;
   }
+  .edit-btn, .delete-btn{
+    background:none;border:none;color:var(--ink-soft);cursor:pointer;
+    font-size:15px;line-height:1;padding:4px 6px;font-family:ui-monospace,monospace;
+  }
+  .delete-btn{font-size:18px;}
+  .edit-btn:hover{color:var(--green-deep);}
   .delete-btn:hover{color:var(--rust);}
+  .editing{
+    outline:2px solid var(--green);outline-offset:2px;border-radius:2px;
+  }
+  .cancel-edit-btn{
+    display:none;width:100%;text-align:center;background:none;border:none;
+    color:var(--ink-soft);font-family:ui-monospace,monospace;font-size:11px;
+    letter-spacing:0.5px;text-transform:uppercase;text-decoration:underline;
+    cursor:pointer;margin-top:8px;padding:4px;
+  }
   .empty{
     text-align:center;color:var(--ink-soft);font-style:italic;
     padding:40px 0;font-size:14px;
@@ -276,6 +289,7 @@
     </div>
 
     <button class="save-btn out" id="btnSave">Save Entry</button>
+    <button type="button" class="cancel-edit-btn" id="btnCancelEdit">Cancel edit</button>
   </div>
 
   <div class="ledger-head">
@@ -315,11 +329,13 @@ const IN_CATEGORIES = ['Owner top-up','Refund','Sale proceeds','Reimbursement','
 let currentType = 'out';
 let entries = [];
 let pendingReceipt = null;
+let editingId = null;
 
 const fSource = document.getElementById('fSource');
 const btnOut = document.getElementById('btnOut');
 const btnIn = document.getElementById('btnIn');
 const btnSave = document.getElementById('btnSave');
+const btnCancelEdit = document.getElementById('btnCancelEdit');
 const lblSource = document.getElementById('lblSource');
 const lblParty = document.getElementById('lblParty');
 const btnReceipt = document.getElementById('btnReceipt');
@@ -389,13 +405,16 @@ function render(){
 
   sorted.forEach(e => {
     const div = document.createElement('div');
-    div.className = 'entry';
+    div.className = 'entry' + (e.id === editingId ? ' editing' : '');
     div.dataset.id = e.id;
     const dateStr = new Date(e.ts).toLocaleDateString(undefined, {month:'short', day:'numeric'});
     div.innerHTML = `
       <div class="desc">${e.source}${e.party ? ' — ' + escapeHtml(e.party) : ''}</div>
       <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount).replace('-','')}</div>
-      <button class="delete-btn" data-id="${e.id}" aria-label="Delete entry" title="Delete entry">×</button>
+      <div class="entry-actions">
+        <button class="edit-btn" data-id="${e.id}" aria-label="Edit entry" title="Edit entry">✎</button>
+        <button class="delete-btn" data-id="${e.id}" aria-label="Delete entry" title="Delete entry">×</button>
+      </div>
       <div class="sub">
         ${e.receipt ? `<img class="receipt-thumb" src="${e.receipt}" data-id="${e.id}" alt="Receipt thumbnail">` : ''}
         <span>${dateStr}</span>
@@ -431,6 +450,50 @@ function saveEntries(){
   }
 }
 
+function resetForm(){
+  document.getElementById('fAmount').value = '';
+  document.getElementById('fParty').value = '';
+  document.getElementById('fNote').value = '';
+  clearPendingReceipt();
+  editingId = null;
+  btnSave.textContent = 'Save Entry';
+  btnCancelEdit.style.display = 'none';
+  setType('out');
+}
+
+function startEdit(id){
+  const entry = entries.find(en => en.id === id);
+  if(!entry) return;
+
+  editingId = id;
+  setType(entry.type);
+  document.getElementById('fAmount').value = entry.amount;
+  fSource.value = entry.source;
+  document.getElementById('fParty').value = entry.party;
+  document.getElementById('fNote').value = entry.note;
+
+  if(entry.receipt){
+    pendingReceipt = entry.receipt;
+    receiptPreviewImg.src = entry.receipt;
+    receiptPreview.style.display = 'flex';
+  }else{
+    pendingReceipt = null;
+    fReceipt.value = '';
+    receiptPreview.style.display = 'none';
+    receiptPreviewImg.src = '';
+  }
+
+  btnSave.textContent = 'Update Entry';
+  btnCancelEdit.style.display = 'block';
+  render();
+  document.querySelector('.entry-form').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+btnCancelEdit.addEventListener('click', () => {
+  resetForm();
+  render();
+});
+
 document.getElementById('btnSave').addEventListener('click', () => {
   const amount = parseFloat(document.getElementById('fAmount').value);
   const source = fSource.value;
@@ -439,6 +502,27 @@ document.getElementById('btnSave').addEventListener('click', () => {
 
   if(!amount || amount <= 0){
     showToast('Enter a valid amount');
+    return;
+  }
+
+  if(editingId){
+    const idx = entries.findIndex(en => en.id === editingId);
+    if(idx === -1){
+      resetForm();
+      return;
+    }
+    const original = entries[idx];
+    entries[idx] = { ...original, type: currentType, amount, source, party, note, receipt: pendingReceipt };
+
+    if(!saveEntries()){
+      entries[idx] = original;
+      showToast('Storage full — try a smaller receipt photo or delete old entries');
+      return;
+    }
+
+    resetForm();
+    render();
+    showToast('Entry updated');
     return;
   }
 
@@ -459,20 +543,23 @@ document.getElementById('btnSave').addEventListener('click', () => {
     return;
   }
 
+  const savedType = currentType;
+  resetForm();
   render();
-  showToast(currentType === 'in' ? 'Money in saved' : 'Money out saved');
-
-  document.getElementById('fAmount').value = '';
-  document.getElementById('fParty').value = '';
-  document.getElementById('fNote').value = '';
-  clearPendingReceipt();
+  showToast(savedType === 'in' ? 'Money in saved' : 'Money out saved');
 });
 
 document.getElementById('entryList').addEventListener('click', (e) => {
+  const editBtn = e.target.closest('.edit-btn');
+  if(editBtn){
+    startEdit(editBtn.dataset.id);
+    return;
+  }
   const delBtn = e.target.closest('.delete-btn');
   if(delBtn){
     const id = delBtn.dataset.id;
     if(confirm('Delete this entry? This cannot be undone.')){
+      if(editingId === id) resetForm();
       entries = entries.filter(entry => entry.id !== id);
       saveEntries();
       render();
