@@ -238,6 +238,25 @@
     max-width:80vw;text-align:center;z-index:1000;
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .sheets-bar{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:10px 20px;background:var(--card);border-bottom:1px solid var(--rule);
+    font-family:ui-monospace,monospace;font-size:11px;color:var(--ink-soft);
+  }
+  .sheets-bar .status{display:flex;align-items:center;gap:6px;overflow:hidden;}
+  .sheets-bar .status .dot{
+    width:7px;height:7px;border-radius:50%;background:var(--ink-soft);flex-shrink:0;
+  }
+  .sheets-bar .status.connected .dot{background:var(--green);}
+  .sheets-bar .status span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sheets-bar .actions{display:flex;gap:10px;flex-shrink:0;}
+  .sheets-bar button{
+    background:none;border:none;color:var(--green-deep);cursor:pointer;
+    font-family:inherit;font-size:inherit;letter-spacing:0.5px;text-transform:uppercase;
+    text-decoration:underline;padding:0;
+  }
+  .sheets-bar button.danger{color:var(--rust);}
 </style>
 </head>
 <body>
@@ -250,6 +269,16 @@
     <div class="meta" id="balanceMeta">0 in · 0 out</div>
   </div>
 </header>
+
+<div class="sheets-bar">
+  <div class="status" id="sheetsStatus">
+    <span class="dot"></span>
+    <span id="sheetsStatusText">Google Sheets: not connected</span>
+  </div>
+  <div class="actions" id="sheetsActions">
+    <button type="button" id="btnConnectSheet">Connect</button>
+  </div>
+</div>
 
 <main>
   <div class="entry-form">
@@ -321,10 +350,26 @@
   </table>
 </div>
 
+<!-- Google Identity Services (OAuth) and API client (Picker). Loaded async; the
+     app works fully without them until "Connect" is clicked. -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js" async defer></script>
+
 <script>
 const STORAGE_KEY = 'ledger-entries';
 const OUT_CATEGORIES = ['Supplies','Travel','Meals','Postage','Cleaning','Repairs','Misc'];
 const IN_CATEGORIES = ['Owner top-up','Refund','Sale proceeds','Reimbursement','Other'];
+
+// ── Google Sheets sync config ────────────────────────────────────────────
+// Fill these in from your own Google Cloud project (see README.md for the
+// exact setup steps). Both values are meant to be public in browser apps —
+// security comes from restricting the Client ID to your Pages origin and
+// the API key to the Sheets/Picker APIs, not from hiding them.
+const GOOGLE_CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com';
+const GOOGLE_API_KEY = 'YOUR_API_KEY';
+const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
+const SHEET_TAB = 'Sheet1';
+const SHEET_HEADER = ['ID','Date','Type','Amount','Category/Source','Party','Note'];
 
 let currentType = 'out';
 let entries = [];
@@ -523,6 +568,7 @@ document.getElementById('btnSave').addEventListener('click', () => {
     resetForm();
     render();
     showToast('Entry updated');
+    syncToSheetIfConnected();
     return;
   }
 
@@ -547,6 +593,7 @@ document.getElementById('btnSave').addEventListener('click', () => {
   resetForm();
   render();
   showToast(savedType === 'in' ? 'Money in saved' : 'Money out saved');
+  syncToSheetIfConnected();
 });
 
 document.getElementById('entryList').addEventListener('click', (e) => {
@@ -564,6 +611,7 @@ document.getElementById('entryList').addEventListener('click', (e) => {
       saveEntries();
       render();
       showToast('Entry deleted');
+      syncToSheetIfConnected();
     }
     return;
   }
@@ -617,6 +665,218 @@ fReceipt.addEventListener('change', () => {
   };
   reader.onerror = () => showToast('Could not read photo');
   reader.readAsDataURL(file);
+});
+
+// ── Google Sheets sync ───────────────────────────────────────────────────
+// Mirror mode: localStorage stays the source of truth. On every successful
+// add/edit/delete we (best-effort) overwrite the connected sheet's data
+// range with the full current entry list. Receipts are never sent — they're
+// large data URLs and not appropriate for spreadsheet cells.
+
+let gAccessToken = null;      // in-memory only; never persisted
+let gTokenClient = null;
+let gPickerLoaded = false;
+let connectedSheetId = localStorage.getItem('sheet-id') || null;
+let connectedSheetName = localStorage.getItem('sheet-name') || null;
+
+const sheetsStatusEl = document.getElementById('sheetsStatus');
+const sheetsStatusText = document.getElementById('sheetsStatusText');
+const sheetsActions = document.getElementById('sheetsActions');
+const btnConnectSheet = document.getElementById('btnConnectSheet');
+
+function sheetsConfigured(){
+  return GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.startsWith('YOUR_') &&
+         GOOGLE_API_KEY && !GOOGLE_API_KEY.startsWith('YOUR_');
+}
+
+function updateSheetsUI(){
+  const connected = !!(gAccessToken && connectedSheetId);
+  sheetsStatusEl.classList.toggle('connected', connected);
+
+  if(!sheetsConfigured()){
+    sheetsStatusText.textContent = 'Google Sheets: not set up (see README)';
+    sheetsActions.innerHTML = '';
+    return;
+  }
+
+  if(connected){
+    sheetsStatusText.textContent = `Synced to: ${connectedSheetName || 'Google Sheet'}`;
+    sheetsActions.innerHTML = '<button type="button" id="btnDisconnectSheet" class="danger">Disconnect</button>';
+    document.getElementById('btnDisconnectSheet').addEventListener('click', disconnectSheet);
+  }else if(connectedSheetId && !gAccessToken){
+    sheetsStatusText.textContent = `Signed out (was: ${connectedSheetName || 'Google Sheet'})`;
+    sheetsActions.innerHTML = '<button type="button" id="btnReconnectSheet">Sign in</button>';
+    document.getElementById('btnReconnectSheet').addEventListener('click', () => connectGoogleSheets(false));
+  }else{
+    sheetsStatusText.textContent = 'Google Sheets: not connected';
+    sheetsActions.innerHTML = '<button type="button" id="btnConnectSheet">Connect</button>';
+    document.getElementById('btnConnectSheet').addEventListener('click', () => connectGoogleSheets(true));
+  }
+}
+
+function initGoogleClients(){
+  if(!sheetsConfigured() || typeof google === 'undefined' || !google.accounts){
+    updateSheetsUI();
+    return;
+  }
+  gTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: GOOGLE_SCOPES,
+    callback: onTokenResponse
+  });
+  updateSheetsUI();
+}
+
+function connectGoogleSheets(pickSheet){
+  if(!gTokenClient){
+    showToast('Google Sheets is still loading — try again in a moment');
+    return;
+  }
+  gTokenClient.callback = (resp) => onTokenResponse(resp, pickSheet);
+  gTokenClient.requestAccessToken({ prompt: connectedSheetId ? '' : 'consent' });
+}
+
+function onTokenResponse(resp, pickSheet){
+  if(resp.error){
+    showToast('Google sign-in failed or was cancelled');
+    return;
+  }
+  gAccessToken = resp.access_token;
+
+  if(pickSheet || !connectedSheetId){
+    openSheetPicker();
+  }else{
+    updateSheetsUI();
+    ensureHeaderRow().then(syncAllToSheet);
+  }
+}
+
+function openSheetPicker(){
+  if(typeof gapi === 'undefined'){
+    showToast('Google Picker is still loading — try again in a moment');
+    return;
+  }
+  gapi.load('picker', () => {
+    gPickerLoaded = true;
+    const view = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
+      .setMimeTypes('application/vnd.google-apps.spreadsheet');
+    const picker = new google.picker.PickerBuilder()
+      .addView(view)
+      .setOAuthToken(gAccessToken)
+      .setDeveloperKey(GOOGLE_API_KEY)
+      .setCallback(pickerCallback)
+      .build();
+    picker.setVisible(true);
+  });
+}
+
+function pickerCallback(data){
+  if(data.action !== google.picker.Action.PICKED) return;
+  const doc = data.docs[0];
+  connectedSheetId = doc.id;
+  connectedSheetName = doc.name;
+  localStorage.setItem('sheet-id', connectedSheetId);
+  localStorage.setItem('sheet-name', connectedSheetName);
+  updateSheetsUI();
+  ensureHeaderRow().then(syncAllToSheet).then(() => {
+    showToast(`Connected to "${connectedSheetName}"`);
+  });
+}
+
+function disconnectSheet(){
+  if(gAccessToken && typeof google !== 'undefined' && google.accounts){
+    google.accounts.oauth2.revoke(gAccessToken, () => {});
+  }
+  gAccessToken = null;
+  connectedSheetId = null;
+  connectedSheetName = null;
+  localStorage.removeItem('sheet-id');
+  localStorage.removeItem('sheet-name');
+  updateSheetsUI();
+  showToast('Disconnected from Google Sheets');
+}
+
+async function sheetsFetch(path, options = {}){
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${connectedSheetId}${path}`, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${gAccessToken}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  });
+  if(res.status === 401){
+    gAccessToken = null;
+    updateSheetsUI();
+    throw new Error('Google session expired');
+  }
+  if(!res.ok){
+    throw new Error(`Sheets API error: ${res.status}`);
+  }
+  return res.json();
+}
+
+async function ensureHeaderRow(){
+  if(!gAccessToken || !connectedSheetId) return;
+  try{
+    await sheetsFetch(`/values/${encodeURIComponent(SHEET_TAB + '!A1')}?valueInputOption=RAW`, {
+      method: 'PUT',
+      body: JSON.stringify({ values: [SHEET_HEADER] })
+    });
+  }catch(e){
+    // best-effort; a later sync will retry
+  }
+}
+
+async function syncAllToSheet(){
+  if(!gAccessToken || !connectedSheetId) return;
+  const chronological = [...entries].sort((a,b) => a.ts - b.ts);
+  const rows = chronological.map(e => [
+    e.id,
+    new Date(e.ts).toISOString().slice(0,10),
+    e.type === 'in' ? 'Money In' : 'Money Out',
+    e.amount.toFixed(2),
+    e.source,
+    e.party,
+    e.note
+  ]);
+
+  try{
+    // Clear a generous range first so deleted/edited rows don't leave stragglers.
+    await sheetsFetch(`/values/${encodeURIComponent(SHEET_TAB + '!A2:G5000')}:clear`, { method: 'POST', body: '{}' });
+    if(rows.length > 0){
+      await sheetsFetch(`/values/${encodeURIComponent(SHEET_TAB + '!A2')}?valueInputOption=RAW`, {
+        method: 'PUT',
+        body: JSON.stringify({ values: rows })
+      });
+    }
+  }catch(e){
+    showToast('Google Sheets sync failed — will retry on next change');
+  }
+}
+
+function syncToSheetIfConnected(){
+  if(gAccessToken && connectedSheetId){
+    syncAllToSheet();
+  }
+}
+
+updateSheetsUI(); // reflect config/connection state immediately, before Google's scripts load
+
+window.addEventListener('load', () => {
+  // google/gapi load async; poll briefly until available.
+  let attempts = 0;
+  const tryInit = () => {
+    attempts++;
+    if(typeof google !== 'undefined' && google.accounts){
+      initGoogleClients();
+    }else if(attempts < 20){
+      setTimeout(tryInit, 250);
+    }else{
+      updateSheetsUI();
+    }
+  };
+  tryInit();
 });
 
 document.getElementById('btnExport').addEventListener('click', () => {
