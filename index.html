@@ -142,10 +142,11 @@
 
   .entry{
     display:grid;
-    grid-template-columns:1fr auto;
+    grid-template-columns:1fr auto auto;
     gap:2px 12px;
     padding:12px 0;
     border-bottom:1px solid var(--rule);
+    align-items:start;
   }
   .entry .desc{font-size:15px;}
   .entry .amt{
@@ -162,10 +163,93 @@
     grid-column:1 / -1;
     font-family:ui-monospace,monospace;font-size:10px;color:var(--ink-soft);
     text-transform:uppercase;letter-spacing:0.5px;margin-top:1px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .entry .receipt-thumb{
+    width:34px;height:34px;object-fit:cover;border:1px solid var(--rule);
+    border-radius:2px;cursor:pointer;flex-shrink:0;
+  }
+  .entry-actions{
+    display:flex;gap:2px;align-self:start;
+  }
+  .edit-btn, .delete-btn{
+    background:none;border:none;color:var(--ink-soft);cursor:pointer;
+    font-size:15px;line-height:1;padding:4px 6px;font-family:ui-monospace,monospace;
+  }
+  .delete-btn{font-size:18px;}
+  .edit-btn:hover{color:var(--green-deep);}
+  .delete-btn:hover{color:var(--rust);}
+  .editing{
+    outline:2px solid var(--green);outline-offset:2px;border-radius:2px;
+  }
+  .cancel-edit-btn{
+    display:none;width:100%;text-align:center;background:none;border:none;
+    color:var(--ink-soft);font-family:ui-monospace,monospace;font-size:11px;
+    letter-spacing:0.5px;text-transform:uppercase;text-decoration:underline;
+    cursor:pointer;margin-top:8px;padding:4px;
   }
   .empty{
     text-align:center;color:var(--ink-soft);font-style:italic;
     padding:40px 0;font-size:14px;
+  }
+
+  .receipt-field{margin-bottom:12px;}
+  .receipt-btn{
+    display:inline-flex;align-items:center;gap:6px;
+    background:transparent;border:1px solid var(--rule);border-radius:3px;
+    padding:8px 12px;font-family:ui-monospace,monospace;font-size:11px;
+    letter-spacing:0.5px;text-transform:uppercase;color:var(--ink-soft);cursor:pointer;
+  }
+  .receipt-preview{
+    display:flex;align-items:center;gap:10px;margin-top:8px;
+  }
+  .receipt-preview img{
+    width:56px;height:56px;object-fit:cover;border:1px solid var(--rule);border-radius:2px;
+  }
+  .receipt-preview button{
+    background:none;border:none;color:var(--rust);font-family:ui-monospace,monospace;
+    font-size:11px;text-transform:uppercase;letter-spacing:0.5px;cursor:pointer;
+    text-decoration:underline;
+  }
+
+  .lightbox{
+    position:fixed;inset:0;background:rgba(0,0,0,0.85);display:none;
+    align-items:center;justify-content:center;z-index:2000;padding:20px;
+  }
+  .lightbox.show{display:flex;}
+  .lightbox img{max-width:100%;max-height:100%;border-radius:2px;}
+
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;
+    align-items:center;justify-content:center;z-index:2100;padding:20px;
+  }
+  .modal-overlay.show{display:flex;}
+  .modal-box{
+    background:var(--card);border:1px solid var(--rule);border-radius:3px;
+    padding:20px;max-width:420px;width:100%;box-shadow:0 4px 20px rgba(0,0,0,0.25);
+  }
+  .modal-box h3{margin:0 0 8px;font-size:18px;font-weight:400;font-style:italic;}
+  .modal-box p{
+    margin:0 0 16px;font-size:13px;color:var(--ink-soft);line-height:1.5;
+  }
+  .modal-box .field{margin-bottom:14px;}
+  .modal-actions{display:flex;flex-direction:column;gap:8px;margin-top:6px;}
+  .modal-actions .link-btn{
+    background:none;border:none;color:var(--ink-soft);font-family:ui-monospace,monospace;
+    font-size:11px;text-transform:uppercase;letter-spacing:0.5px;text-decoration:underline;
+    cursor:pointer;padding:4px;
+  }
+  .modal-actions .link-btn.danger{color:var(--rust);}
+
+  #printArea{display:none;}
+  @media print{
+    body *{visibility:hidden;}
+    #printArea, #printArea *{visibility:visible;}
+    #printArea{display:block;position:absolute;left:0;top:0;width:100%;padding:20px;}
+    #printArea table{width:100%;border-collapse:collapse;font-size:12px;}
+    #printArea th, #printArea td{border:1px solid #999;padding:6px 8px;text-align:left;}
+    #printArea h1{font-size:20px;margin-bottom:4px;}
+    #printArea .print-summary{margin-bottom:16px;font-family:ui-monospace,monospace;font-size:12px;}
   }
 
   .toast{
@@ -176,6 +260,25 @@
     max-width:80vw;text-align:center;z-index:1000;
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .sheets-bar{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:10px 20px;background:var(--card);border-bottom:1px solid var(--rule);
+    font-family:ui-monospace,monospace;font-size:11px;color:var(--ink-soft);
+  }
+  .sheets-bar .status{display:flex;align-items:center;gap:6px;overflow:hidden;}
+  .sheets-bar .status .dot{
+    width:7px;height:7px;border-radius:50%;background:var(--ink-soft);flex-shrink:0;
+  }
+  .sheets-bar .status.connected .dot{background:var(--green);}
+  .sheets-bar .status span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sheets-bar .actions{display:flex;gap:10px;flex-shrink:0;}
+  .sheets-bar button{
+    background:none;border:none;color:var(--green-deep);cursor:pointer;
+    font-family:inherit;font-size:inherit;letter-spacing:0.5px;text-transform:uppercase;
+    text-decoration:underline;padding:0;
+  }
+  .sheets-bar button.danger{color:var(--rust);}
 </style>
 </head>
 <body>
@@ -188,6 +291,16 @@
     <div class="meta" id="balanceMeta">0 in · 0 out</div>
   </div>
 </header>
+
+<div class="sheets-bar">
+  <div class="status" id="sheetsStatus">
+    <span class="dot"></span>
+    <span id="sheetsStatusText">Google Sheets: not connected</span>
+  </div>
+  <div class="actions" id="sheetsActions">
+    <button type="button" id="btnConnectSheet">Connect</button>
+  </div>
+</div>
 
 <main>
   <div class="entry-form">
@@ -216,12 +329,26 @@
       <textarea id="fNote" placeholder="e.g. reimbursed by Sarah, or reference number"></textarea>
     </div>
 
+    <div class="receipt-field">
+      <label style="display:block;font-family:ui-monospace,monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink-soft);margin-bottom:5px;">Receipt</label>
+      <button type="button" class="receipt-btn" id="btnReceipt">📷 Snap receipt</button>
+      <input type="file" id="fReceipt" accept="image/*" capture="environment" style="display:none;">
+      <div class="receipt-preview" id="receiptPreview" style="display:none;">
+        <img id="receiptPreviewImg" alt="Receipt preview">
+        <button type="button" id="btnRemoveReceipt">Remove</button>
+      </div>
+    </div>
+
     <button class="save-btn out" id="btnSave">Save Entry</button>
+    <button type="button" class="cancel-edit-btn" id="btnCancelEdit">Cancel edit</button>
   </div>
 
   <div class="ledger-head">
     <h2>Entries</h2>
-    <button class="export-link" id="btnExport">Export CSV</button>
+    <div>
+      <button class="export-link" id="btnExport">Export CSV</button>
+      <button class="export-link" id="btnExportPdf">Export PDF</button>
+    </div>
   </div>
 
   <div id="entryList"></div>
@@ -230,20 +357,83 @@
 
 <div class="toast" id="toast"></div>
 
+<div class="lightbox" id="lightbox">
+  <img id="lightboxImg" alt="Receipt">
+</div>
+
+<div class="modal-overlay" id="sheetsSettingsModal">
+  <div class="modal-box">
+    <h3>Google Sheets setup</h3>
+    <p>Paste your own Google Cloud OAuth Client ID and API key (see README.md for how to create them). These are saved only in this browser's local storage — never committed to the site's source, never sent anywhere but Google.</p>
+    <div class="field">
+      <label>OAuth Client ID</label>
+      <input type="text" id="settingsClientId" placeholder="xxxxxxxx.apps.googleusercontent.com">
+    </div>
+    <div class="field">
+      <label>API Key</label>
+      <input type="text" id="settingsApiKey" placeholder="AIza...">
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="save-btn in" id="btnSaveSheetsSettings">Save</button>
+      <button type="button" class="link-btn" id="btnCancelSheetsSettings">Cancel</button>
+      <button type="button" class="link-btn danger" id="btnClearSheetsSettings">Clear saved credentials</button>
+    </div>
+  </div>
+</div>
+
+<div id="printArea">
+  <h1>Petty Cash Ledger</h1>
+  <div class="print-summary" id="printSummary"></div>
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Type</th><th>Amount</th><th>Category/Source</th><th>Party</th><th>Note</th></tr>
+    </thead>
+    <tbody id="printTableBody"></tbody>
+  </table>
+</div>
+
+<!-- Google Identity Services (OAuth) and API client (Picker). Loaded async; the
+     app works fully without them until "Connect" is clicked. -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js" async defer></script>
+
 <script>
 const STORAGE_KEY = 'ledger-entries';
 const OUT_CATEGORIES = ['Supplies','Travel','Meals','Postage','Cleaning','Repairs','Misc'];
 const IN_CATEGORIES = ['Owner top-up','Refund','Sale proceeds','Reimbursement','Other'];
 
+// ── Google Sheets sync config ────────────────────────────────────────────
+// No credentials are stored in this file or shipped with the deployed
+// site. Each user enters their own Google Cloud Client ID / API key once
+// via the "Set up" prompt (see README.md for how to create them) and it's
+// saved only in that browser's localStorage — never committed to git,
+// never present in the page source anyone else would view.
+const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
+const SHEET_TAB = 'Sheet1';
+const SHEET_HEADER = ['ID','Date','Type','Amount','Category/Source','Party','Note'];
+
+function getGoogleClientId(){ return localStorage.getItem('google-client-id') || ''; }
+function getGoogleApiKey(){ return localStorage.getItem('google-api-key') || ''; }
+
 let currentType = 'out';
 let entries = [];
+let pendingReceipt = null;
+let editingId = null;
 
 const fSource = document.getElementById('fSource');
 const btnOut = document.getElementById('btnOut');
 const btnIn = document.getElementById('btnIn');
 const btnSave = document.getElementById('btnSave');
+const btnCancelEdit = document.getElementById('btnCancelEdit');
 const lblSource = document.getElementById('lblSource');
 const lblParty = document.getElementById('lblParty');
+const btnReceipt = document.getElementById('btnReceipt');
+const fReceipt = document.getElementById('fReceipt');
+const receiptPreview = document.getElementById('receiptPreview');
+const receiptPreviewImg = document.getElementById('receiptPreviewImg');
+const btnRemoveReceipt = document.getElementById('btnRemoveReceipt');
+const lightbox = document.getElementById('lightbox');
+const lightboxImg = document.getElementById('lightboxImg');
 
 function populateCategories(){
   const list = currentType === 'out' ? OUT_CATEGORIES : IN_CATEGORIES;
@@ -304,12 +494,20 @@ function render(){
 
   sorted.forEach(e => {
     const div = document.createElement('div');
-    div.className = 'entry';
+    div.className = 'entry' + (e.id === editingId ? ' editing' : '');
+    div.dataset.id = e.id;
     const dateStr = new Date(e.ts).toLocaleDateString(undefined, {month:'short', day:'numeric'});
     div.innerHTML = `
       <div class="desc">${e.source}${e.party ? ' — ' + escapeHtml(e.party) : ''}</div>
       <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount).replace('-','')}</div>
-      <div class="sub">${dateStr}</div>
+      <div class="entry-actions">
+        <button class="edit-btn" data-id="${e.id}" aria-label="Edit entry" title="Edit entry">✎</button>
+        <button class="delete-btn" data-id="${e.id}" aria-label="Delete entry" title="Delete entry">×</button>
+      </div>
+      <div class="sub">
+        ${e.receipt ? `<img class="receipt-thumb" src="${e.receipt}" data-id="${e.id}" alt="Receipt thumbnail">` : ''}
+        <span>${dateStr}</span>
+      </div>
       ${e.note ? `<div class="note">"${escapeHtml(e.note)}"</div>` : ''}
     `;
     list.appendChild(div);
@@ -335,10 +533,55 @@ function loadEntries(){
 function saveEntries(){
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    return true;
   }catch(e){
-    showToast('Storage error — entry not saved');
+    return false;
   }
 }
+
+function resetForm(){
+  document.getElementById('fAmount').value = '';
+  document.getElementById('fParty').value = '';
+  document.getElementById('fNote').value = '';
+  clearPendingReceipt();
+  editingId = null;
+  btnSave.textContent = 'Save Entry';
+  btnCancelEdit.style.display = 'none';
+  setType('out');
+}
+
+function startEdit(id){
+  const entry = entries.find(en => en.id === id);
+  if(!entry) return;
+
+  editingId = id;
+  setType(entry.type);
+  document.getElementById('fAmount').value = entry.amount;
+  fSource.value = entry.source;
+  document.getElementById('fParty').value = entry.party;
+  document.getElementById('fNote').value = entry.note;
+
+  if(entry.receipt){
+    pendingReceipt = entry.receipt;
+    receiptPreviewImg.src = entry.receipt;
+    receiptPreview.style.display = 'flex';
+  }else{
+    pendingReceipt = null;
+    fReceipt.value = '';
+    receiptPreview.style.display = 'none';
+    receiptPreviewImg.src = '';
+  }
+
+  btnSave.textContent = 'Update Entry';
+  btnCancelEdit.style.display = 'block';
+  render();
+  document.querySelector('.entry-form').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+btnCancelEdit.addEventListener('click', () => {
+  resetForm();
+  render();
+});
 
 document.getElementById('btnSave').addEventListener('click', () => {
   const amount = parseFloat(document.getElementById('fAmount').value);
@@ -351,6 +594,28 @@ document.getElementById('btnSave').addEventListener('click', () => {
     return;
   }
 
+  if(editingId){
+    const idx = entries.findIndex(en => en.id === editingId);
+    if(idx === -1){
+      resetForm();
+      return;
+    }
+    const original = entries[idx];
+    entries[idx] = { ...original, type: currentType, amount, source, party, note, receipt: pendingReceipt };
+
+    if(!saveEntries()){
+      entries[idx] = original;
+      showToast('Storage full — try a smaller receipt photo or delete old entries');
+      return;
+    }
+
+    resetForm();
+    render();
+    showToast('Entry updated');
+    syncToSheetIfConnected();
+    return;
+  }
+
   entries.push({
     id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
     type: currentType,
@@ -358,16 +623,351 @@ document.getElementById('btnSave').addEventListener('click', () => {
     source,
     party,
     note,
+    receipt: pendingReceipt,
     ts: Date.now()
   });
 
-  saveEntries();
-  render();
-  showToast(currentType === 'in' ? 'Money in saved' : 'Money out saved');
+  if(!saveEntries()){
+    entries.pop();
+    showToast('Storage full — try a smaller receipt photo or delete old entries');
+    return;
+  }
 
-  document.getElementById('fAmount').value = '';
-  document.getElementById('fParty').value = '';
-  document.getElementById('fNote').value = '';
+  const savedType = currentType;
+  resetForm();
+  render();
+  showToast(savedType === 'in' ? 'Money in saved' : 'Money out saved');
+  syncToSheetIfConnected();
+});
+
+document.getElementById('entryList').addEventListener('click', (e) => {
+  const editBtn = e.target.closest('.edit-btn');
+  if(editBtn){
+    startEdit(editBtn.dataset.id);
+    return;
+  }
+  const delBtn = e.target.closest('.delete-btn');
+  if(delBtn){
+    const id = delBtn.dataset.id;
+    if(confirm('Delete this entry? This cannot be undone.')){
+      if(editingId === id) resetForm();
+      entries = entries.filter(entry => entry.id !== id);
+      saveEntries();
+      render();
+      showToast('Entry deleted');
+      syncToSheetIfConnected();
+    }
+    return;
+  }
+  const thumb = e.target.closest('.receipt-thumb');
+  if(thumb){
+    lightboxImg.src = thumb.src;
+    lightbox.classList.add('show');
+  }
+});
+
+lightbox.addEventListener('click', () => {
+  lightbox.classList.remove('show');
+  lightboxImg.src = '';
+});
+
+function clearPendingReceipt(){
+  pendingReceipt = null;
+  fReceipt.value = '';
+  receiptPreview.style.display = 'none';
+  receiptPreviewImg.src = '';
+}
+
+btnReceipt.addEventListener('click', () => fReceipt.click());
+
+btnRemoveReceipt.addEventListener('click', clearPendingReceipt);
+
+fReceipt.addEventListener('change', () => {
+  const file = fReceipt.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 1000;
+      let { width, height } = img;
+      if(width > maxDim || height > maxDim){
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      pendingReceipt = canvas.toDataURL('image/jpeg', 0.7);
+      receiptPreviewImg.src = pendingReceipt;
+      receiptPreview.style.display = 'flex';
+    };
+    img.src = reader.result;
+  };
+  reader.onerror = () => showToast('Could not read photo');
+  reader.readAsDataURL(file);
+});
+
+// ── Google Sheets sync ───────────────────────────────────────────────────
+// Mirror mode: localStorage stays the source of truth. On every successful
+// add/edit/delete we (best-effort) overwrite the connected sheet's data
+// range with the full current entry list. Receipts are never sent — they're
+// large data URLs and not appropriate for spreadsheet cells.
+
+let gAccessToken = null;      // in-memory only; never persisted
+let gTokenClient = null;
+let gPickerLoaded = false;
+let connectedSheetId = localStorage.getItem('sheet-id') || null;
+let connectedSheetName = localStorage.getItem('sheet-name') || null;
+
+const sheetsStatusEl = document.getElementById('sheetsStatus');
+const sheetsStatusText = document.getElementById('sheetsStatusText');
+const sheetsActions = document.getElementById('sheetsActions');
+const sheetsSettingsModal = document.getElementById('sheetsSettingsModal');
+const settingsClientId = document.getElementById('settingsClientId');
+const settingsApiKey = document.getElementById('settingsApiKey');
+
+function sheetsConfigured(){
+  return !!(getGoogleClientId() && getGoogleApiKey());
+}
+
+function updateSheetsUI(){
+  const connected = !!(gAccessToken && connectedSheetId);
+  sheetsStatusEl.classList.toggle('connected', connected);
+  const gearBtn = '<button type="button" id="btnEditSheetsSettings" title="Edit Google Sheets credentials">⚙</button>';
+
+  if(!sheetsConfigured()){
+    sheetsStatusText.textContent = 'Google Sheets: not set up';
+    sheetsActions.innerHTML = '<button type="button" id="btnSetupSheets">Set up</button>';
+    document.getElementById('btnSetupSheets').addEventListener('click', openSheetsSettings);
+    return;
+  }
+
+  if(connected){
+    sheetsStatusText.textContent = `Synced to: ${connectedSheetName || 'Google Sheet'}`;
+    sheetsActions.innerHTML = '<button type="button" id="btnDisconnectSheet" class="danger">Disconnect</button>' + gearBtn;
+    document.getElementById('btnDisconnectSheet').addEventListener('click', disconnectSheet);
+  }else if(connectedSheetId && !gAccessToken){
+    sheetsStatusText.textContent = `Signed out (was: ${connectedSheetName || 'Google Sheet'})`;
+    sheetsActions.innerHTML = '<button type="button" id="btnReconnectSheet">Sign in</button>' + gearBtn;
+    document.getElementById('btnReconnectSheet').addEventListener('click', () => connectGoogleSheets(false));
+  }else{
+    sheetsStatusText.textContent = 'Google Sheets: not connected';
+    sheetsActions.innerHTML = '<button type="button" id="btnConnectSheet">Connect</button>' + gearBtn;
+    document.getElementById('btnConnectSheet').addEventListener('click', () => connectGoogleSheets(true));
+  }
+  document.getElementById('btnEditSheetsSettings').addEventListener('click', openSheetsSettings);
+}
+
+function initGoogleClients(){
+  if(!sheetsConfigured() || typeof google === 'undefined' || !google.accounts){
+    updateSheetsUI();
+    return;
+  }
+  gTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: getGoogleClientId(),
+    scope: GOOGLE_SCOPES,
+    callback: onTokenResponse
+  });
+  updateSheetsUI();
+}
+
+function openSheetsSettings(){
+  settingsClientId.value = getGoogleClientId();
+  settingsApiKey.value = getGoogleApiKey();
+  sheetsSettingsModal.classList.add('show');
+}
+
+function closeSheetsSettings(){
+  sheetsSettingsModal.classList.remove('show');
+}
+
+document.getElementById('btnCancelSheetsSettings').addEventListener('click', closeSheetsSettings);
+
+document.getElementById('btnSaveSheetsSettings').addEventListener('click', () => {
+  const id = settingsClientId.value.trim();
+  const key = settingsApiKey.value.trim();
+  if(!id || !key){
+    showToast('Enter both the Client ID and API key');
+    return;
+  }
+  localStorage.setItem('google-client-id', id);
+  localStorage.setItem('google-api-key', key);
+  closeSheetsSettings();
+  gTokenClient = null;
+  initGoogleClients();
+  showToast('Saved — credentials stay only in this browser');
+});
+
+document.getElementById('btnClearSheetsSettings').addEventListener('click', () => {
+  localStorage.removeItem('google-client-id');
+  localStorage.removeItem('google-api-key');
+  if(gAccessToken || connectedSheetId) disconnectSheet();
+  settingsClientId.value = '';
+  settingsApiKey.value = '';
+  gTokenClient = null;
+  closeSheetsSettings();
+  updateSheetsUI();
+  showToast('Cleared saved Google Sheets credentials');
+});
+
+sheetsSettingsModal.addEventListener('click', (e) => {
+  if(e.target === sheetsSettingsModal) closeSheetsSettings();
+});
+
+function connectGoogleSheets(pickSheet){
+  if(!gTokenClient){
+    showToast('Google Sheets is still loading — try again in a moment');
+    return;
+  }
+  gTokenClient.callback = (resp) => onTokenResponse(resp, pickSheet);
+  gTokenClient.requestAccessToken({ prompt: connectedSheetId ? '' : 'consent' });
+}
+
+function onTokenResponse(resp, pickSheet){
+  if(resp.error){
+    showToast('Google sign-in failed or was cancelled');
+    return;
+  }
+  gAccessToken = resp.access_token;
+
+  if(pickSheet || !connectedSheetId){
+    openSheetPicker();
+  }else{
+    updateSheetsUI();
+    ensureHeaderRow().then(syncAllToSheet);
+  }
+}
+
+function openSheetPicker(){
+  if(typeof gapi === 'undefined'){
+    showToast('Google Picker is still loading — try again in a moment');
+    return;
+  }
+  gapi.load('picker', () => {
+    gPickerLoaded = true;
+    const view = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
+      .setMimeTypes('application/vnd.google-apps.spreadsheet');
+    const picker = new google.picker.PickerBuilder()
+      .addView(view)
+      .setOAuthToken(gAccessToken)
+      .setDeveloperKey(getGoogleApiKey())
+      .setCallback(pickerCallback)
+      .build();
+    picker.setVisible(true);
+  });
+}
+
+function pickerCallback(data){
+  if(data.action !== google.picker.Action.PICKED) return;
+  const doc = data.docs[0];
+  connectedSheetId = doc.id;
+  connectedSheetName = doc.name;
+  localStorage.setItem('sheet-id', connectedSheetId);
+  localStorage.setItem('sheet-name', connectedSheetName);
+  updateSheetsUI();
+  ensureHeaderRow().then(syncAllToSheet).then(() => {
+    showToast(`Connected to "${connectedSheetName}"`);
+  });
+}
+
+function disconnectSheet(){
+  if(gAccessToken && typeof google !== 'undefined' && google.accounts){
+    google.accounts.oauth2.revoke(gAccessToken, () => {});
+  }
+  gAccessToken = null;
+  connectedSheetId = null;
+  connectedSheetName = null;
+  localStorage.removeItem('sheet-id');
+  localStorage.removeItem('sheet-name');
+  updateSheetsUI();
+  showToast('Disconnected from Google Sheets');
+}
+
+async function sheetsFetch(path, options = {}){
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${connectedSheetId}${path}`, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${gAccessToken}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  });
+  if(res.status === 401){
+    gAccessToken = null;
+    updateSheetsUI();
+    throw new Error('Google session expired');
+  }
+  if(!res.ok){
+    throw new Error(`Sheets API error: ${res.status}`);
+  }
+  return res.json();
+}
+
+async function ensureHeaderRow(){
+  if(!gAccessToken || !connectedSheetId) return;
+  try{
+    await sheetsFetch(`/values/${encodeURIComponent(SHEET_TAB + '!A1')}?valueInputOption=RAW`, {
+      method: 'PUT',
+      body: JSON.stringify({ values: [SHEET_HEADER] })
+    });
+  }catch(e){
+    // best-effort; a later sync will retry
+  }
+}
+
+async function syncAllToSheet(){
+  if(!gAccessToken || !connectedSheetId) return;
+  const chronological = [...entries].sort((a,b) => a.ts - b.ts);
+  const rows = chronological.map(e => [
+    e.id,
+    new Date(e.ts).toISOString().slice(0,10),
+    e.type === 'in' ? 'Money In' : 'Money Out',
+    e.amount.toFixed(2),
+    e.source,
+    e.party,
+    e.note
+  ]);
+
+  try{
+    // Clear a generous range first so deleted/edited rows don't leave stragglers.
+    await sheetsFetch(`/values/${encodeURIComponent(SHEET_TAB + '!A2:G5000')}:clear`, { method: 'POST', body: '{}' });
+    if(rows.length > 0){
+      await sheetsFetch(`/values/${encodeURIComponent(SHEET_TAB + '!A2')}?valueInputOption=RAW`, {
+        method: 'PUT',
+        body: JSON.stringify({ values: rows })
+      });
+    }
+  }catch(e){
+    showToast('Google Sheets sync failed — will retry on next change');
+  }
+}
+
+function syncToSheetIfConnected(){
+  if(gAccessToken && connectedSheetId){
+    syncAllToSheet();
+  }
+}
+
+updateSheetsUI(); // reflect config/connection state immediately, before Google's scripts load
+
+window.addEventListener('load', () => {
+  // google/gapi load async; poll briefly until available.
+  let attempts = 0;
+  const tryInit = () => {
+    attempts++;
+    if(typeof google !== 'undefined' && google.accounts){
+      initGoogleClients();
+    }else if(attempts < 20){
+      setTimeout(tryInit, 250);
+    }else{
+      updateSheetsUI();
+    }
+  };
+  tryInit();
 });
 
 document.getElementById('btnExport').addEventListener('click', () => {
@@ -395,6 +995,37 @@ document.getElementById('btnExport').addEventListener('click', () => {
   a.click();
   URL.revokeObjectURL(url);
   showToast('CSV downloaded');
+});
+
+document.getElementById('btnExportPdf').addEventListener('click', () => {
+  if(entries.length === 0){
+    showToast('Nothing to export yet');
+    return;
+  }
+
+  let balance = 0, inCount = 0, outCount = 0;
+  const chronological = [...entries].sort((a,b) => a.ts - b.ts);
+  chronological.forEach(e => {
+    balance += e.type === 'in' ? e.amount : -e.amount;
+    if(e.type === 'in') inCount++; else outCount++;
+  });
+
+  document.getElementById('printSummary').textContent =
+    `Balance: ${fmt(balance)}  ·  ${inCount} in · ${outCount} out  ·  Generated ${new Date().toLocaleString()}`;
+
+  const tbody = document.getElementById('printTableBody');
+  tbody.innerHTML = chronological.map(e => `
+    <tr>
+      <td>${new Date(e.ts).toISOString().slice(0,10)}</td>
+      <td>${e.type === 'in' ? 'Money In' : 'Money Out'}</td>
+      <td>${fmt(e.amount)}</td>
+      <td>${escapeHtml(e.source)}</td>
+      <td>${escapeHtml(e.party)}</td>
+      <td>${escapeHtml(e.note)}</td>
+    </tr>
+  `).join('');
+
+  window.print();
 });
 
 setType('out');
