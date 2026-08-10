@@ -46,8 +46,11 @@ data range with the current entry list. Receipt photos are never sent —
 only the text fields (date, type, amount, category/source, party, note).
 
 This is entirely client-side (no backend), so setup means creating your
-own OAuth Client ID and API key in Google Cloud Console and pasting them
-into `index.html`.
+own OAuth Client ID and API key in Google Cloud Console and entering them
+into the app itself — **not** into the repo. The credentials are never
+committed to git or shipped with the deployed site; they're saved only in
+your browser's `localStorage` after you type them into the "Set up"
+prompt.
 
 ### 1. Create a Google Cloud project
 
@@ -76,32 +79,29 @@ into `index.html`.
    - Restrict it to the Sheets API and Picker API.
    - Copy the generated **API key**.
 
-### 4. Wire it into the app
+### 4. Enter it into the app
 
-In `index.html`, find the config block near the top of the `<script>` tag
-and replace the placeholders:
+Open the deployed site. Under the header, the "Google Sheets" bar shows
+**Set up** — click it, paste your Client ID and API key into the modal,
+and click **Save**. That's it; nothing to commit or redeploy. From then
+on the bar shows **Connect** — clicking it signs you into your own Google
+account and lets you pick or create the spreadsheet to sync to.
 
-```js
-const GOOGLE_CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com';
-const GOOGLE_API_KEY = 'YOUR_API_KEY';
-```
-
-Commit, push, and redeploy. A "Connect" button appears under the header —
-clicking it signs the visitor into their own Google account (each user
-authenticates individually; the Client ID just identifies the app to
-Google) and lets them pick or create the spreadsheet to sync to.
+Because the credentials live in `localStorage`, they're per-browser: if
+you use the app on another device, you'll enter them there too (via the
+same "Set up" / gear-icon prompt). Use **Clear saved credentials** in that
+same prompt to remove them from a device.
 
 ### Security notes
 
-- The Client ID and API key are meant to be public in browser apps —
-  visible in page source is expected. Security comes from restricting the
-  Client ID to your GitHub Pages origin and the API key to specific APIs,
-  not from hiding them.
+- Nothing in this repo or the deployed page source ever contains your
+  Client ID or API key — they only exist in the `localStorage` of a
+  browser where you've explicitly entered them via the "Set up" prompt.
 - The app requests the `drive.file` scope, not full Drive access — it can
   only see the one spreadsheet a user explicitly picks, not their whole
   Drive.
-- The access token lives only in memory (a JS variable), never in
-  `localStorage`. It expires after about an hour and isn't persisted, so
-  each new session requires signing in again.
+- The access token (obtained after sign-in) lives only in memory (a JS
+  variable), never in `localStorage`. It expires after about an hour and
+  isn't persisted, so each new session requires signing in again.
 - Users can revoke access at any time from
   [myaccount.google.com/permissions](https://myaccount.google.com/permissions).

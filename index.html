@@ -219,6 +219,28 @@
   .lightbox.show{display:flex;}
   .lightbox img{max-width:100%;max-height:100%;border-radius:2px;}
 
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;
+    align-items:center;justify-content:center;z-index:2100;padding:20px;
+  }
+  .modal-overlay.show{display:flex;}
+  .modal-box{
+    background:var(--card);border:1px solid var(--rule);border-radius:3px;
+    padding:20px;max-width:420px;width:100%;box-shadow:0 4px 20px rgba(0,0,0,0.25);
+  }
+  .modal-box h3{margin:0 0 8px;font-size:18px;font-weight:400;font-style:italic;}
+  .modal-box p{
+    margin:0 0 16px;font-size:13px;color:var(--ink-soft);line-height:1.5;
+  }
+  .modal-box .field{margin-bottom:14px;}
+  .modal-actions{display:flex;flex-direction:column;gap:8px;margin-top:6px;}
+  .modal-actions .link-btn{
+    background:none;border:none;color:var(--ink-soft);font-family:ui-monospace,monospace;
+    font-size:11px;text-transform:uppercase;letter-spacing:0.5px;text-decoration:underline;
+    cursor:pointer;padding:4px;
+  }
+  .modal-actions .link-btn.danger{color:var(--rust);}
+
   #printArea{display:none;}
   @media print{
     body *{visibility:hidden;}
@@ -339,6 +361,26 @@
   <img id="lightboxImg" alt="Receipt">
 </div>
 
+<div class="modal-overlay" id="sheetsSettingsModal">
+  <div class="modal-box">
+    <h3>Google Sheets setup</h3>
+    <p>Paste your own Google Cloud OAuth Client ID and API key (see README.md for how to create them). These are saved only in this browser's local storage — never committed to the site's source, never sent anywhere but Google.</p>
+    <div class="field">
+      <label>OAuth Client ID</label>
+      <input type="text" id="settingsClientId" placeholder="xxxxxxxx.apps.googleusercontent.com">
+    </div>
+    <div class="field">
+      <label>API Key</label>
+      <input type="text" id="settingsApiKey" placeholder="AIza...">
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="save-btn in" id="btnSaveSheetsSettings">Save</button>
+      <button type="button" class="link-btn" id="btnCancelSheetsSettings">Cancel</button>
+      <button type="button" class="link-btn danger" id="btnClearSheetsSettings">Clear saved credentials</button>
+    </div>
+  </div>
+</div>
+
 <div id="printArea">
   <h1>Petty Cash Ledger</h1>
   <div class="print-summary" id="printSummary"></div>
@@ -361,15 +403,17 @@ const OUT_CATEGORIES = ['Supplies','Travel','Meals','Postage','Cleaning','Repair
 const IN_CATEGORIES = ['Owner top-up','Refund','Sale proceeds','Reimbursement','Other'];
 
 // ── Google Sheets sync config ────────────────────────────────────────────
-// Fill these in from your own Google Cloud project (see README.md for the
-// exact setup steps). Both values are meant to be public in browser apps —
-// security comes from restricting the Client ID to your Pages origin and
-// the API key to the Sheets/Picker APIs, not from hiding them.
-const GOOGLE_CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com';
-const GOOGLE_API_KEY = 'YOUR_API_KEY';
+// No credentials are stored in this file or shipped with the deployed
+// site. Each user enters their own Google Cloud Client ID / API key once
+// via the "Set up" prompt (see README.md for how to create them) and it's
+// saved only in that browser's localStorage — never committed to git,
+// never present in the page source anyone else would view.
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
 const SHEET_TAB = 'Sheet1';
 const SHEET_HEADER = ['ID','Date','Type','Amount','Category/Source','Party','Note'];
+
+function getGoogleClientId(){ return localStorage.getItem('google-client-id') || ''; }
+function getGoogleApiKey(){ return localStorage.getItem('google-api-key') || ''; }
 
 let currentType = 'out';
 let entries = [];
@@ -682,36 +726,40 @@ let connectedSheetName = localStorage.getItem('sheet-name') || null;
 const sheetsStatusEl = document.getElementById('sheetsStatus');
 const sheetsStatusText = document.getElementById('sheetsStatusText');
 const sheetsActions = document.getElementById('sheetsActions');
-const btnConnectSheet = document.getElementById('btnConnectSheet');
+const sheetsSettingsModal = document.getElementById('sheetsSettingsModal');
+const settingsClientId = document.getElementById('settingsClientId');
+const settingsApiKey = document.getElementById('settingsApiKey');
 
 function sheetsConfigured(){
-  return GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.startsWith('YOUR_') &&
-         GOOGLE_API_KEY && !GOOGLE_API_KEY.startsWith('YOUR_');
+  return !!(getGoogleClientId() && getGoogleApiKey());
 }
 
 function updateSheetsUI(){
   const connected = !!(gAccessToken && connectedSheetId);
   sheetsStatusEl.classList.toggle('connected', connected);
+  const gearBtn = '<button type="button" id="btnEditSheetsSettings" title="Edit Google Sheets credentials">⚙</button>';
 
   if(!sheetsConfigured()){
-    sheetsStatusText.textContent = 'Google Sheets: not set up (see README)';
-    sheetsActions.innerHTML = '';
+    sheetsStatusText.textContent = 'Google Sheets: not set up';
+    sheetsActions.innerHTML = '<button type="button" id="btnSetupSheets">Set up</button>';
+    document.getElementById('btnSetupSheets').addEventListener('click', openSheetsSettings);
     return;
   }
 
   if(connected){
     sheetsStatusText.textContent = `Synced to: ${connectedSheetName || 'Google Sheet'}`;
-    sheetsActions.innerHTML = '<button type="button" id="btnDisconnectSheet" class="danger">Disconnect</button>';
+    sheetsActions.innerHTML = '<button type="button" id="btnDisconnectSheet" class="danger">Disconnect</button>' + gearBtn;
     document.getElementById('btnDisconnectSheet').addEventListener('click', disconnectSheet);
   }else if(connectedSheetId && !gAccessToken){
     sheetsStatusText.textContent = `Signed out (was: ${connectedSheetName || 'Google Sheet'})`;
-    sheetsActions.innerHTML = '<button type="button" id="btnReconnectSheet">Sign in</button>';
+    sheetsActions.innerHTML = '<button type="button" id="btnReconnectSheet">Sign in</button>' + gearBtn;
     document.getElementById('btnReconnectSheet').addEventListener('click', () => connectGoogleSheets(false));
   }else{
     sheetsStatusText.textContent = 'Google Sheets: not connected';
-    sheetsActions.innerHTML = '<button type="button" id="btnConnectSheet">Connect</button>';
+    sheetsActions.innerHTML = '<button type="button" id="btnConnectSheet">Connect</button>' + gearBtn;
     document.getElementById('btnConnectSheet').addEventListener('click', () => connectGoogleSheets(true));
   }
+  document.getElementById('btnEditSheetsSettings').addEventListener('click', openSheetsSettings);
 }
 
 function initGoogleClients(){
@@ -720,12 +768,55 @@ function initGoogleClients(){
     return;
   }
   gTokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: GOOGLE_CLIENT_ID,
+    client_id: getGoogleClientId(),
     scope: GOOGLE_SCOPES,
     callback: onTokenResponse
   });
   updateSheetsUI();
 }
+
+function openSheetsSettings(){
+  settingsClientId.value = getGoogleClientId();
+  settingsApiKey.value = getGoogleApiKey();
+  sheetsSettingsModal.classList.add('show');
+}
+
+function closeSheetsSettings(){
+  sheetsSettingsModal.classList.remove('show');
+}
+
+document.getElementById('btnCancelSheetsSettings').addEventListener('click', closeSheetsSettings);
+
+document.getElementById('btnSaveSheetsSettings').addEventListener('click', () => {
+  const id = settingsClientId.value.trim();
+  const key = settingsApiKey.value.trim();
+  if(!id || !key){
+    showToast('Enter both the Client ID and API key');
+    return;
+  }
+  localStorage.setItem('google-client-id', id);
+  localStorage.setItem('google-api-key', key);
+  closeSheetsSettings();
+  gTokenClient = null;
+  initGoogleClients();
+  showToast('Saved — credentials stay only in this browser');
+});
+
+document.getElementById('btnClearSheetsSettings').addEventListener('click', () => {
+  localStorage.removeItem('google-client-id');
+  localStorage.removeItem('google-api-key');
+  if(gAccessToken || connectedSheetId) disconnectSheet();
+  settingsClientId.value = '';
+  settingsApiKey.value = '';
+  gTokenClient = null;
+  closeSheetsSettings();
+  updateSheetsUI();
+  showToast('Cleared saved Google Sheets credentials');
+});
+
+sheetsSettingsModal.addEventListener('click', (e) => {
+  if(e.target === sheetsSettingsModal) closeSheetsSettings();
+});
 
 function connectGoogleSheets(pickSheet){
   if(!gTokenClient){
@@ -763,7 +854,7 @@ function openSheetPicker(){
     const picker = new google.picker.PickerBuilder()
       .addView(view)
       .setOAuthToken(gAccessToken)
-      .setDeveloperKey(GOOGLE_API_KEY)
+      .setDeveloperKey(getGoogleApiKey())
       .setCallback(pickerCallback)
       .build();
     picker.setVisible(true);
