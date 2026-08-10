@@ -142,10 +142,11 @@
 
   .entry{
     display:grid;
-    grid-template-columns:1fr auto;
+    grid-template-columns:1fr auto auto;
     gap:2px 12px;
     padding:12px 0;
     border-bottom:1px solid var(--rule);
+    align-items:start;
   }
   .entry .desc{font-size:15px;}
   .entry .amt{
@@ -162,10 +163,58 @@
     grid-column:1 / -1;
     font-family:ui-monospace,monospace;font-size:10px;color:var(--ink-soft);
     text-transform:uppercase;letter-spacing:0.5px;margin-top:1px;
+    display:flex;align-items:center;gap:8px;
   }
+  .entry .receipt-thumb{
+    width:34px;height:34px;object-fit:cover;border:1px solid var(--rule);
+    border-radius:2px;cursor:pointer;flex-shrink:0;
+  }
+  .delete-btn{
+    background:none;border:none;color:var(--ink-soft);cursor:pointer;
+    font-size:18px;line-height:1;padding:2px 4px;font-family:ui-monospace,monospace;
+    align-self:start;
+  }
+  .delete-btn:hover{color:var(--rust);}
   .empty{
     text-align:center;color:var(--ink-soft);font-style:italic;
     padding:40px 0;font-size:14px;
+  }
+
+  .receipt-field{margin-bottom:12px;}
+  .receipt-btn{
+    display:inline-flex;align-items:center;gap:6px;
+    background:transparent;border:1px solid var(--rule);border-radius:3px;
+    padding:8px 12px;font-family:ui-monospace,monospace;font-size:11px;
+    letter-spacing:0.5px;text-transform:uppercase;color:var(--ink-soft);cursor:pointer;
+  }
+  .receipt-preview{
+    display:flex;align-items:center;gap:10px;margin-top:8px;
+  }
+  .receipt-preview img{
+    width:56px;height:56px;object-fit:cover;border:1px solid var(--rule);border-radius:2px;
+  }
+  .receipt-preview button{
+    background:none;border:none;color:var(--rust);font-family:ui-monospace,monospace;
+    font-size:11px;text-transform:uppercase;letter-spacing:0.5px;cursor:pointer;
+    text-decoration:underline;
+  }
+
+  .lightbox{
+    position:fixed;inset:0;background:rgba(0,0,0,0.85);display:none;
+    align-items:center;justify-content:center;z-index:2000;padding:20px;
+  }
+  .lightbox.show{display:flex;}
+  .lightbox img{max-width:100%;max-height:100%;border-radius:2px;}
+
+  #printArea{display:none;}
+  @media print{
+    body *{visibility:hidden;}
+    #printArea, #printArea *{visibility:visible;}
+    #printArea{display:block;position:absolute;left:0;top:0;width:100%;padding:20px;}
+    #printArea table{width:100%;border-collapse:collapse;font-size:12px;}
+    #printArea th, #printArea td{border:1px solid #999;padding:6px 8px;text-align:left;}
+    #printArea h1{font-size:20px;margin-bottom:4px;}
+    #printArea .print-summary{margin-bottom:16px;font-family:ui-monospace,monospace;font-size:12px;}
   }
 
   .toast{
@@ -216,12 +265,25 @@
       <textarea id="fNote" placeholder="e.g. reimbursed by Sarah, or reference number"></textarea>
     </div>
 
+    <div class="receipt-field">
+      <label style="display:block;font-family:ui-monospace,monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink-soft);margin-bottom:5px;">Receipt</label>
+      <button type="button" class="receipt-btn" id="btnReceipt">📷 Snap receipt</button>
+      <input type="file" id="fReceipt" accept="image/*" capture="environment" style="display:none;">
+      <div class="receipt-preview" id="receiptPreview" style="display:none;">
+        <img id="receiptPreviewImg" alt="Receipt preview">
+        <button type="button" id="btnRemoveReceipt">Remove</button>
+      </div>
+    </div>
+
     <button class="save-btn out" id="btnSave">Save Entry</button>
   </div>
 
   <div class="ledger-head">
     <h2>Entries</h2>
-    <button class="export-link" id="btnExport">Export CSV</button>
+    <div>
+      <button class="export-link" id="btnExport">Export CSV</button>
+      <button class="export-link" id="btnExportPdf">Export PDF</button>
+    </div>
   </div>
 
   <div id="entryList"></div>
@@ -230,6 +292,21 @@
 
 <div class="toast" id="toast"></div>
 
+<div class="lightbox" id="lightbox">
+  <img id="lightboxImg" alt="Receipt">
+</div>
+
+<div id="printArea">
+  <h1>Petty Cash Ledger</h1>
+  <div class="print-summary" id="printSummary"></div>
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Type</th><th>Amount</th><th>Category/Source</th><th>Party</th><th>Note</th></tr>
+    </thead>
+    <tbody id="printTableBody"></tbody>
+  </table>
+</div>
+
 <script>
 const STORAGE_KEY = 'ledger-entries';
 const OUT_CATEGORIES = ['Supplies','Travel','Meals','Postage','Cleaning','Repairs','Misc'];
@@ -237,6 +314,7 @@ const IN_CATEGORIES = ['Owner top-up','Refund','Sale proceeds','Reimbursement','
 
 let currentType = 'out';
 let entries = [];
+let pendingReceipt = null;
 
 const fSource = document.getElementById('fSource');
 const btnOut = document.getElementById('btnOut');
@@ -244,6 +322,13 @@ const btnIn = document.getElementById('btnIn');
 const btnSave = document.getElementById('btnSave');
 const lblSource = document.getElementById('lblSource');
 const lblParty = document.getElementById('lblParty');
+const btnReceipt = document.getElementById('btnReceipt');
+const fReceipt = document.getElementById('fReceipt');
+const receiptPreview = document.getElementById('receiptPreview');
+const receiptPreviewImg = document.getElementById('receiptPreviewImg');
+const btnRemoveReceipt = document.getElementById('btnRemoveReceipt');
+const lightbox = document.getElementById('lightbox');
+const lightboxImg = document.getElementById('lightboxImg');
 
 function populateCategories(){
   const list = currentType === 'out' ? OUT_CATEGORIES : IN_CATEGORIES;
@@ -305,11 +390,16 @@ function render(){
   sorted.forEach(e => {
     const div = document.createElement('div');
     div.className = 'entry';
+    div.dataset.id = e.id;
     const dateStr = new Date(e.ts).toLocaleDateString(undefined, {month:'short', day:'numeric'});
     div.innerHTML = `
       <div class="desc">${e.source}${e.party ? ' — ' + escapeHtml(e.party) : ''}</div>
       <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount).replace('-','')}</div>
-      <div class="sub">${dateStr}</div>
+      <button class="delete-btn" data-id="${e.id}" aria-label="Delete entry" title="Delete entry">×</button>
+      <div class="sub">
+        ${e.receipt ? `<img class="receipt-thumb" src="${e.receipt}" data-id="${e.id}" alt="Receipt thumbnail">` : ''}
+        <span>${dateStr}</span>
+      </div>
       ${e.note ? `<div class="note">"${escapeHtml(e.note)}"</div>` : ''}
     `;
     list.appendChild(div);
@@ -335,8 +425,9 @@ function loadEntries(){
 function saveEntries(){
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    return true;
   }catch(e){
-    showToast('Storage error — entry not saved');
+    return false;
   }
 }
 
@@ -358,16 +449,87 @@ document.getElementById('btnSave').addEventListener('click', () => {
     source,
     party,
     note,
+    receipt: pendingReceipt,
     ts: Date.now()
   });
 
-  saveEntries();
+  if(!saveEntries()){
+    entries.pop();
+    showToast('Storage full — try a smaller receipt photo or delete old entries');
+    return;
+  }
+
   render();
   showToast(currentType === 'in' ? 'Money in saved' : 'Money out saved');
 
   document.getElementById('fAmount').value = '';
   document.getElementById('fParty').value = '';
   document.getElementById('fNote').value = '';
+  clearPendingReceipt();
+});
+
+document.getElementById('entryList').addEventListener('click', (e) => {
+  const delBtn = e.target.closest('.delete-btn');
+  if(delBtn){
+    const id = delBtn.dataset.id;
+    if(confirm('Delete this entry? This cannot be undone.')){
+      entries = entries.filter(entry => entry.id !== id);
+      saveEntries();
+      render();
+      showToast('Entry deleted');
+    }
+    return;
+  }
+  const thumb = e.target.closest('.receipt-thumb');
+  if(thumb){
+    lightboxImg.src = thumb.src;
+    lightbox.classList.add('show');
+  }
+});
+
+lightbox.addEventListener('click', () => {
+  lightbox.classList.remove('show');
+  lightboxImg.src = '';
+});
+
+function clearPendingReceipt(){
+  pendingReceipt = null;
+  fReceipt.value = '';
+  receiptPreview.style.display = 'none';
+  receiptPreviewImg.src = '';
+}
+
+btnReceipt.addEventListener('click', () => fReceipt.click());
+
+btnRemoveReceipt.addEventListener('click', clearPendingReceipt);
+
+fReceipt.addEventListener('change', () => {
+  const file = fReceipt.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 1000;
+      let { width, height } = img;
+      if(width > maxDim || height > maxDim){
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      pendingReceipt = canvas.toDataURL('image/jpeg', 0.7);
+      receiptPreviewImg.src = pendingReceipt;
+      receiptPreview.style.display = 'flex';
+    };
+    img.src = reader.result;
+  };
+  reader.onerror = () => showToast('Could not read photo');
+  reader.readAsDataURL(file);
 });
 
 document.getElementById('btnExport').addEventListener('click', () => {
@@ -395,6 +557,37 @@ document.getElementById('btnExport').addEventListener('click', () => {
   a.click();
   URL.revokeObjectURL(url);
   showToast('CSV downloaded');
+});
+
+document.getElementById('btnExportPdf').addEventListener('click', () => {
+  if(entries.length === 0){
+    showToast('Nothing to export yet');
+    return;
+  }
+
+  let balance = 0, inCount = 0, outCount = 0;
+  const chronological = [...entries].sort((a,b) => a.ts - b.ts);
+  chronological.forEach(e => {
+    balance += e.type === 'in' ? e.amount : -e.amount;
+    if(e.type === 'in') inCount++; else outCount++;
+  });
+
+  document.getElementById('printSummary').textContent =
+    `Balance: ${fmt(balance)}  ·  ${inCount} in · ${outCount} out  ·  Generated ${new Date().toLocaleString()}`;
+
+  const tbody = document.getElementById('printTableBody');
+  tbody.innerHTML = chronological.map(e => `
+    <tr>
+      <td>${new Date(e.ts).toISOString().slice(0,10)}</td>
+      <td>${e.type === 'in' ? 'Money In' : 'Money Out'}</td>
+      <td>${fmt(e.amount)}</td>
+      <td>${escapeHtml(e.source)}</td>
+      <td>${escapeHtml(e.party)}</td>
+      <td>${escapeHtml(e.note)}</td>
+    </tr>
+  `).join('');
+
+  window.print();
 });
 
 setType('out');
