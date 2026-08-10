@@ -193,6 +193,28 @@
     padding:40px 0;font-size:14px;
   }
 
+  .month-header{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:12px 0;cursor:pointer;user-select:none;
+    border-bottom:1px solid var(--rule);
+  }
+  .month-header .month-label{
+    display:flex;align-items:center;gap:6px;
+    font-family:ui-monospace,monospace;font-size:12px;text-transform:uppercase;
+    letter-spacing:1px;color:var(--ink);
+  }
+  .month-header .chevron{
+    display:inline-block;font-size:10px;color:var(--ink-soft);
+    transition:transform 0.15s ease;
+  }
+  .month-header.collapsed .chevron{transform:rotate(-90deg);}
+  .month-header .month-total{
+    font-family:ui-monospace,monospace;font-size:12px;font-weight:600;
+  }
+  .month-header .month-total.pos{color:var(--green-deep);}
+  .month-header .month-total.neg{color:var(--rust);}
+  .month-entries.collapsed{display:none;}
+
   .receipt-field{margin-bottom:12px;}
   .receipt-btn{
     display:inline-flex;align-items:center;gap:6px;
@@ -424,6 +446,8 @@ let currentType = 'out';
 let entries = [];
 let pendingReceipt = null;
 let editingId = null;
+let expandedMonths = new Set();
+let monthsInitialized = false;
 
 const fSource = document.getElementById('fSource');
 const btnOut = document.getElementById('btnOut');
@@ -488,6 +512,16 @@ function combineDateAndTime(dateStr, timeSource){
   return new Date(y, m - 1, d, t.getHours(), t.getMinutes(), t.getSeconds(), t.getMilliseconds()).getTime();
 }
 
+function monthKeyFromTs(ts){
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthLabelFromKey(key){
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
 function render(){
   let balance = 0;
   let inCount = 0, outCount = 0;
@@ -514,25 +548,63 @@ function render(){
   }
   empty.style.display = 'none';
 
+  // Group into months. `sorted` is already newest-first by ts, and ts is a
+  // real calendar timestamp, so entries of the same month stay contiguous —
+  // no separate sort/grouping pass needed beyond a simple walk.
+  const groups = [];
+  let currentGroup = null;
   sorted.forEach(e => {
-    const div = document.createElement('div');
-    div.className = 'entry' + (e.id === editingId ? ' editing' : '');
-    div.dataset.id = e.id;
-    const dateStr = new Date(e.ts).toLocaleDateString(undefined, {month:'short', day:'numeric'});
-    div.innerHTML = `
-      <div class="desc">${e.source}${e.party ? ' — ' + escapeHtml(e.party) : ''}</div>
-      <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount).replace('-','')}</div>
-      <div class="entry-actions">
-        <button class="edit-btn" data-id="${e.id}" aria-label="Edit entry" title="Edit entry">✎</button>
-        <button class="delete-btn" data-id="${e.id}" aria-label="Delete entry" title="Delete entry">×</button>
-      </div>
-      <div class="sub">
-        ${e.receipt ? `<img class="receipt-thumb" src="${e.receipt}" data-id="${e.id}" alt="Receipt thumbnail">` : ''}
-        <span>${dateStr}</span>
-      </div>
-      ${e.note ? `<div class="note">"${escapeHtml(e.note)}"</div>` : ''}
+    const key = monthKeyFromTs(e.ts);
+    if(!currentGroup || currentGroup.key !== key){
+      currentGroup = { key, label: monthLabelFromKey(key), entries: [], net: 0 };
+      groups.push(currentGroup);
+    }
+    currentGroup.entries.push(e);
+    currentGroup.net += e.type === 'in' ? e.amount : -e.amount;
+  });
+
+  if(!monthsInitialized && groups.length > 0){
+    expandedMonths.add(groups[0].key);
+    monthsInitialized = true;
+  }
+
+  groups.forEach(group => {
+    const isExpanded = expandedMonths.has(group.key);
+
+    const header = document.createElement('div');
+    header.className = 'month-header' + (isExpanded ? '' : ' collapsed');
+    header.dataset.monthKey = group.key;
+    header.innerHTML = `
+      <span class="month-label"><span class="chevron">▾</span>${group.label} <span style="color:var(--ink-soft);font-weight:400;">(${group.entries.length})</span></span>
+      <span class="month-total ${group.net < 0 ? 'neg' : 'pos'}">${fmt(group.net)}</span>
     `;
-    list.appendChild(div);
+    list.appendChild(header);
+
+    const container = document.createElement('div');
+    container.className = 'month-entries' + (isExpanded ? '' : ' collapsed');
+
+    group.entries.forEach(e => {
+      const div = document.createElement('div');
+      div.className = 'entry' + (e.id === editingId ? ' editing' : '');
+      div.dataset.id = e.id;
+      const dateStr = new Date(e.ts).toLocaleDateString(undefined, {month:'short', day:'numeric'});
+      div.innerHTML = `
+        <div class="desc">${e.source}${e.party ? ' — ' + escapeHtml(e.party) : ''}</div>
+        <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount).replace('-','')}</div>
+        <div class="entry-actions">
+          <button class="edit-btn" data-id="${e.id}" aria-label="Edit entry" title="Edit entry">✎</button>
+          <button class="delete-btn" data-id="${e.id}" aria-label="Delete entry" title="Delete entry">×</button>
+        </div>
+        <div class="sub">
+          ${e.receipt ? `<img class="receipt-thumb" src="${e.receipt}" data-id="${e.id}" alt="Receipt thumbnail">` : ''}
+          <span>${dateStr}</span>
+        </div>
+        ${e.note ? `<div class="note">"${escapeHtml(e.note)}"</div>` : ''}
+      `;
+      container.appendChild(div);
+    });
+
+    list.appendChild(container);
   });
 }
 
@@ -578,6 +650,7 @@ function startEdit(id){
   if(!entry) return;
 
   editingId = id;
+  expandedMonths.add(monthKeyFromTs(entry.ts));
   setType(entry.type);
   document.getElementById('fAmount').value = entry.amount;
   fSource.value = entry.source;
@@ -627,6 +700,7 @@ document.getElementById('btnSave').addEventListener('click', () => {
     }
     const original = entries[idx];
     const ts = combineDateAndTime(dateStr, original.ts);
+    expandedMonths.add(monthKeyFromTs(ts));
     entries[idx] = { ...original, type: currentType, amount, source, party, note, receipt: pendingReceipt, ts };
 
     if(!saveEntries()){
@@ -642,6 +716,7 @@ document.getElementById('btnSave').addEventListener('click', () => {
     return;
   }
 
+  const newTs = combineDateAndTime(dateStr, Date.now());
   entries.push({
     id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
     type: currentType,
@@ -650,8 +725,9 @@ document.getElementById('btnSave').addEventListener('click', () => {
     party,
     note,
     receipt: pendingReceipt,
-    ts: combineDateAndTime(dateStr, Date.now())
+    ts: newTs
   });
+  expandedMonths.add(monthKeyFromTs(newTs));
 
   if(!saveEntries()){
     entries.pop();
@@ -667,6 +743,17 @@ document.getElementById('btnSave').addEventListener('click', () => {
 });
 
 document.getElementById('entryList').addEventListener('click', (e) => {
+  const monthHeader = e.target.closest('.month-header');
+  if(monthHeader){
+    const key = monthHeader.dataset.monthKey;
+    if(expandedMonths.has(key)){
+      expandedMonths.delete(key);
+    }else{
+      expandedMonths.add(key);
+    }
+    render();
+    return;
+  }
   const editBtn = e.target.closest('.edit-btn');
   if(editBtn){
     startEdit(editBtn.dataset.id);

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const CACHE_NAME = `petty-cash-ledger-${CACHE_VERSION}`;
 
 const APP_SHELL = [
