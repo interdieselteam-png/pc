@@ -267,11 +267,65 @@
   @media print{
     body *{visibility:hidden;}
     #printArea, #printArea *{visibility:visible;}
-    #printArea{display:block;position:absolute;left:0;top:0;width:100%;padding:20px;}
-    #printArea table{width:100%;border-collapse:collapse;font-size:12px;}
-    #printArea th, #printArea td{border:1px solid #999;padding:6px 8px;text-align:left;}
-    #printArea h1{font-size:20px;margin-bottom:4px;}
-    #printArea .print-summary{margin-bottom:16px;font-family:ui-monospace,monospace;font-size:12px;}
+    #printArea{
+      display:block;position:absolute;left:0;top:0;width:100%;padding:28px;
+      font-family:'Georgia','Iowan Old Style',serif;color:#2a2620;
+    }
+    #printArea .print-eyebrow{
+      font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:9px;letter-spacing:2px;
+      text-transform:uppercase;color:#6b6455;
+    }
+    #printArea h1{font-size:24px;margin:2px 0 4px;font-weight:400;font-style:italic;}
+    #printArea .print-meta{
+      font-family:ui-monospace,monospace;font-size:10px;color:#6b6455;margin-bottom:16px;
+    }
+
+    #printArea .print-summary{
+      display:flex;gap:28px;margin-bottom:22px;padding:14px 18px;
+      border:1px solid #d8d2c2;background:#fffdf7;
+    }
+    #printArea .summary-item{
+      font-family:ui-monospace,monospace;font-size:10px;text-transform:uppercase;
+      letter-spacing:0.5px;color:#6b6455;
+    }
+    #printArea .summary-item .value{
+      display:block;font-size:17px;font-weight:700;color:#2a2620;
+      font-family:'Georgia',serif;letter-spacing:-0.3px;margin-top:3px;
+    }
+    #printArea .summary-item .value.pos{color:#2c4d3c;}
+    #printArea .summary-item .value.neg{color:#a4462c;}
+
+    #printArea .print-month{margin-top:20px; break-inside:avoid;}
+    #printArea .print-month-head{
+      display:flex;justify-content:space-between;align-items:baseline;
+      border-bottom:1.5px solid #2a2620;padding-bottom:5px;margin-bottom:6px;
+    }
+    #printArea .print-month-head h2{
+      font-size:12px;font-family:ui-monospace,monospace;text-transform:uppercase;
+      letter-spacing:1.5px;margin:0;font-weight:700;
+    }
+    #printArea .print-month-head .subtotal{font-family:ui-monospace,monospace;font-size:12px;font-weight:700;}
+    #printArea .print-month-head .subtotal.pos{color:#2c4d3c;}
+    #printArea .print-month-head .subtotal.neg{color:#a4462c;}
+
+    #printArea table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:4px;}
+    #printArea th{
+      text-align:left;font-family:ui-monospace,monospace;font-size:9px;text-transform:uppercase;
+      letter-spacing:0.5px;color:#6b6455;padding:5px 8px;border-bottom:1px solid #2a2620;
+    }
+    #printArea td{padding:5px 8px;border-bottom:1px solid #d8d2c2;vertical-align:top;}
+    #printArea tbody tr:nth-child(even) td{background:#f6f3ec;}
+    #printArea td.amt{text-align:right;font-family:ui-monospace,monospace;white-space:nowrap;font-weight:600;}
+    #printArea td.amt.in{color:#2c4d3c;}
+    #printArea td.amt.out{color:#a4462c;}
+
+    #printArea .print-footer{
+      margin-top:40px;padding-top:16px;border-top:1px solid #d8d2c2;
+      display:flex;gap:40px;break-inside:avoid;
+    }
+    #printArea .sign-line{flex:1;font-family:ui-monospace,monospace;font-size:9px;
+      text-transform:uppercase;letter-spacing:0.5px;color:#6b6455;}
+    #printArea .sign-line .line{border-bottom:1px solid #2a2620;height:36px;}
   }
 
   .toast{
@@ -409,14 +463,15 @@
 </div>
 
 <div id="printArea">
+  <div class="print-eyebrow">Running Ledger — Printed Statement</div>
   <h1>Petty Cash Ledger</h1>
-  <div class="print-summary" id="printSummary"></div>
-  <table>
-    <thead>
-      <tr><th>Date</th><th>Type</th><th>Amount</th><th>Category/Source</th><th>Party</th><th>Note</th></tr>
-    </thead>
-    <tbody id="printTableBody"></tbody>
-  </table>
+  <div class="print-meta" id="printMeta"></div>
+  <div class="print-summary" id="printSummaryBox"></div>
+  <div id="printMonths"></div>
+  <div class="print-footer">
+    <div class="sign-line">Prepared by<div class="line"></div></div>
+    <div class="sign-line">Approved by<div class="line"></div></div>
+  </div>
 </div>
 
 <!-- Google Identity Services (OAuth) and API client (Picker). Loaded async; the
@@ -1116,26 +1171,58 @@ document.getElementById('btnExportPdf').addEventListener('click', () => {
     return;
   }
 
-  let balance = 0, inCount = 0, outCount = 0;
+  let balance = 0, inTotal = 0, outTotal = 0;
   const chronological = [...entries].sort((a,b) => a.ts - b.ts);
   chronological.forEach(e => {
-    balance += e.type === 'in' ? e.amount : -e.amount;
-    if(e.type === 'in') inCount++; else outCount++;
+    if(e.type === 'in'){ balance += e.amount; inTotal += e.amount; }
+    else { balance -= e.amount; outTotal += e.amount; }
   });
 
-  document.getElementById('printSummary').textContent =
-    `Balance: ${fmt(balance)}  ·  ${inCount} in · ${outCount} out  ·  Generated ${new Date().toLocaleString()}`;
+  document.getElementById('printMeta').textContent = `Generated ${new Date().toLocaleString()}`;
 
-  const tbody = document.getElementById('printTableBody');
-  tbody.innerHTML = chronological.map(e => `
-    <tr>
-      <td>${dateStrFromTs(e.ts)}</td>
-      <td>${e.type === 'in' ? 'Money In' : 'Money Out'}</td>
-      <td>${fmt(e.amount)}</td>
-      <td>${escapeHtml(e.source)}</td>
-      <td>${escapeHtml(e.party)}</td>
-      <td>${escapeHtml(e.note)}</td>
-    </tr>
+  document.getElementById('printSummaryBox').innerHTML = `
+    <div class="summary-item">Balance<span class="value ${balance < 0 ? 'neg' : 'pos'}">${fmt(balance)}</span></div>
+    <div class="summary-item">Money In<span class="value pos">${fmt(inTotal)}</span></div>
+    <div class="summary-item">Money Out<span class="value neg">${fmt(outTotal)}</span></div>
+    <div class="summary-item">Entries<span class="value">${chronological.length}</span></div>
+  `;
+
+  const groups = [];
+  let cur = null;
+  chronological.forEach(e => {
+    const key = monthKeyFromTs(e.ts);
+    if(!cur || cur.key !== key){
+      cur = { key, label: monthLabelFromKey(key), entries: [], net: 0 };
+      groups.push(cur);
+    }
+    cur.entries.push(e);
+    cur.net += e.type === 'in' ? e.amount : -e.amount;
+  });
+
+  document.getElementById('printMonths').innerHTML = groups.map(group => `
+    <div class="print-month">
+      <div class="print-month-head">
+        <h2>${group.label}</h2>
+        <span class="subtotal ${group.net < 0 ? 'neg' : 'pos'}">${fmt(group.net)}</span>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Type</th><th>Category/Source</th><th>Party</th><th>Note</th><th style="text-align:right;">Amount</th></tr>
+        </thead>
+        <tbody>
+          ${group.entries.map(e => `
+            <tr>
+              <td>${dateStrFromTs(e.ts)}</td>
+              <td>${e.type === 'in' ? 'In' : 'Out'}</td>
+              <td>${escapeHtml(e.source)}</td>
+              <td>${escapeHtml(e.party)}</td>
+              <td>${escapeHtml(e.note)}</td>
+              <td class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount).replace('-','')}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
   `).join('');
 
   window.print();
