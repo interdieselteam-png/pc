@@ -265,11 +265,17 @@
 
   .print-doc{display:none;}
   @media print{
-    body *{visibility:hidden;}
-    .print-doc, .print-doc *{visibility:visible;}
+    /* display:none (not visibility:hidden) so hidden content doesn't still
+       occupy layout height and spill onto a spurious blank second page. */
+    body > *:not(.print-doc){display:none;}
     .print-doc{
-      display:block;position:absolute;left:0;top:0;width:100%;padding:28px;
+      display:block;position:relative;padding:34px 28px 28px;
+      border:1px solid #d8d2c2;
       font-family:'Georgia','Iowan Old Style',serif;color:#2a2620;
+    }
+    .print-doc::before{
+      content:"";position:absolute;top:0;left:0;right:0;height:6px;
+      background:#a4462c;
     }
     .print-doc .print-eyebrow{
       font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:9px;letter-spacing:2px;
@@ -289,7 +295,7 @@
       letter-spacing:0.5px;color:#6b6455;
     }
     .print-doc .summary-item .value{
-      display:block;font-size:17px;font-weight:700;color:#2a2620;
+      display:block;font-size:17px;font-weight:700;color:#2a2620;text-transform:none;
       font-family:'Georgia',serif;letter-spacing:-0.3px;margin-top:3px;
     }
     .print-doc .summary-item .value.pos{color:#2c4d3c;}
@@ -330,26 +336,29 @@
     /* Invoice-specific print elements */
     .print-doc .print-company-header{
       display:flex;justify-content:space-between;align-items:flex-start;
-      border-bottom:2px solid #2a2620;padding-bottom:14px;margin-bottom:20px;
+      border-bottom:2px solid #a4462c;padding-bottom:16px;margin-bottom:22px;
     }
-    .print-doc .print-company-header .company-name{font-size:18px;font-style:italic;}
+    .print-doc .print-company-header .company-name{font-size:19px;font-style:italic;}
     .print-doc .print-company-header .company-info{
       font-family:ui-monospace,monospace;font-size:10px;color:#6b6455;line-height:1.6;margin-top:4px;
     }
     .print-doc .print-invoice-meta{text-align:right;font-family:ui-monospace,monospace;font-size:11px;}
-    .print-doc .print-invoice-meta .invoice-no{font-size:16px;font-weight:700;color:#2a2620;}
+    .print-doc .print-invoice-meta .print-eyebrow{color:#a4462c;font-weight:700;}
+    .print-doc .print-invoice-meta .invoice-no{font-size:21px;font-weight:700;color:#2a2620;margin-top:2px;}
     .print-doc .print-bill-to{margin-bottom:20px;}
     .print-doc .print-bill-to .label{
       font-family:ui-monospace,monospace;font-size:9px;text-transform:uppercase;
       letter-spacing:1px;color:#6b6455;
     }
-    .print-doc .print-bill-to .client-name{font-size:15px;margin-top:2px;}
+    .print-doc .print-bill-to .client-name{font-size:16px;margin-top:2px;font-weight:600;}
     .print-doc .print-invoice-totals{
-      margin-left:auto;width:260px;margin-top:10px;font-family:ui-monospace,monospace;font-size:12px;
+      margin-left:auto;width:280px;margin-top:16px;font-family:ui-monospace,monospace;font-size:12px;
+      border:1px solid #d8d2c2;background:#fffdf7;padding:14px 16px;
     }
     .print-doc .print-invoice-totals .row{display:flex;justify-content:space-between;padding:4px 0;}
     .print-doc .print-invoice-totals .row.grand{
-      border-top:1.5px solid #2a2620;margin-top:4px;padding-top:8px;font-size:14px;font-weight:700;
+      border-top:1.5px solid #a4462c;margin-top:6px;padding-top:9px;
+      font-size:16px;font-weight:700;color:#a4462c;
     }
     .print-doc .print-notes{
       margin-top:24px;font-size:12px;color:#6b6455;font-style:italic;
@@ -1454,7 +1463,7 @@ document.getElementById('btnExportPdf').addEventListener('click', () => {
 
 // ── Invoices ──────────────────────────────────────────────────────────────
 
-const COMPANY_LOGO = 'data:image/png;base64,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';
+const COMPANY_LOGO = 'data:image/png;base64,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';
 
 const COMPANY = {
   name: 'Inter Diesel Works LTD',
