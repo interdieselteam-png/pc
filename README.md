@@ -1,7 +1,13 @@
-# Petty Cash Ledger
+# Inter Diesel Works — Ledger & Invoices
 
-A small offline-first PWA for tracking petty cash in and out. Data is stored
-locally in the browser (`localStorage`) — nothing is sent to a server.
+A small offline-first PWA with two tools for Inter Diesel Works:
+
+- **Ledger** — track petty cash in and out.
+- **Invoices** — generate GPS tracker installation invoices (client, date,
+  and per-item vehicle/IMEI/SIM card details), with optional VAT.
+
+Data is stored locally in the browser (`localStorage`) — nothing is sent to
+a server.
 
 ## Run locally
 
@@ -37,6 +43,26 @@ To enable it:
 Because the app is served from a repo subpath on GitHub Pages
 (`/<repo>/`), all asset paths are relative so it works both locally and
 once deployed.
+
+## Invoices
+
+The Invoices tab lets you build a GPS tracker installation invoice:
+
+- Company details (name, address, phone, email) and logo are hardcoded in
+  `index.html` (`COMPANY` / `COMPANY_LOGO` constants) — edit those if the
+  company details ever change.
+- Invoice number auto-increments (`INV-0001`, `INV-0002`, …) and is only
+  consumed when an invoice is actually saved, so cancelling a draft or
+  switching tabs doesn't burn a number.
+- Each invoice can have multiple line items (e.g. several trackers on one
+  fleet job), each with its own vehicle reg, IMEI, and SIM card number.
+- VAT is a per-invoice toggle (defaults to 16%, editable) rather than
+  always-on or always-off.
+- Invoices are saved to `localStorage` (separate from ledger entries) with
+  full edit/delete/re-print support, same as the ledger.
+- **Print** on an invoice builds a styled, print-only statement (company
+  header + logo, bill-to, itemized table, totals, signature lines) and
+  opens the browser print dialog — choose "Save as PDF" for a PDF copy.
 
 ## Google Sheets sync (optional)
 
