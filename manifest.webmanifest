@@ -1,7 +1,7 @@
 {
-  "name": "Petty Cash Ledger",
-  "short_name": "Ledger",
-  "description": "A simple offline-first running ledger for tracking petty cash in and out.",
+  "name": "Inter Diesel Works — Ledger & Invoices",
+  "short_name": "IDW Ledger",
+  "description": "Offline-first petty cash ledger and GPS tracker invoicing for Inter Diesel Works.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

@@ -3,16 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<meta name="description" content="A simple offline-first running ledger for tracking petty cash in and out.">
+<meta name="description" content="Offline-first petty cash ledger and GPS tracker invoicing for Inter Diesel Works.">
 <meta name="theme-color" content="#2a2620">
-<title>Petty Cash Ledger</title>
+<title>Inter Diesel Works — Ledger & Invoices</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Ledger">
+<meta name="apple-mobile-web-app-title" content="IDW Ledger">
 
 <style>
   :root{
@@ -263,70 +263,176 @@
   }
   .modal-actions .link-btn.danger{color:var(--rust);}
 
-  #printArea{display:none;}
+  .print-doc{display:none;}
   @media print{
     body *{visibility:hidden;}
-    #printArea, #printArea *{visibility:visible;}
-    #printArea{
+    .print-doc, .print-doc *{visibility:visible;}
+    .print-doc{
       display:block;position:absolute;left:0;top:0;width:100%;padding:28px;
       font-family:'Georgia','Iowan Old Style',serif;color:#2a2620;
     }
-    #printArea .print-eyebrow{
+    .print-doc .print-eyebrow{
       font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:9px;letter-spacing:2px;
       text-transform:uppercase;color:#6b6455;
     }
-    #printArea h1{font-size:24px;margin:2px 0 4px;font-weight:400;font-style:italic;}
-    #printArea .print-meta{
+    .print-doc h1{font-size:24px;margin:2px 0 4px;font-weight:400;font-style:italic;}
+    .print-doc .print-meta{
       font-family:ui-monospace,monospace;font-size:10px;color:#6b6455;margin-bottom:16px;
     }
 
-    #printArea .print-summary{
+    .print-doc .print-summary{
       display:flex;gap:28px;margin-bottom:22px;padding:14px 18px;
       border:1px solid #d8d2c2;background:#fffdf7;
     }
-    #printArea .summary-item{
+    .print-doc .summary-item{
       font-family:ui-monospace,monospace;font-size:10px;text-transform:uppercase;
       letter-spacing:0.5px;color:#6b6455;
     }
-    #printArea .summary-item .value{
+    .print-doc .summary-item .value{
       display:block;font-size:17px;font-weight:700;color:#2a2620;
       font-family:'Georgia',serif;letter-spacing:-0.3px;margin-top:3px;
     }
-    #printArea .summary-item .value.pos{color:#2c4d3c;}
-    #printArea .summary-item .value.neg{color:#a4462c;}
+    .print-doc .summary-item .value.pos{color:#2c4d3c;}
+    .print-doc .summary-item .value.neg{color:#a4462c;}
 
-    #printArea .print-month{margin-top:20px; break-inside:avoid;}
-    #printArea .print-month-head{
+    .print-doc .print-month{margin-top:20px; break-inside:avoid;}
+    .print-doc .print-month-head{
       display:flex;justify-content:space-between;align-items:baseline;
       border-bottom:1.5px solid #2a2620;padding-bottom:5px;margin-bottom:6px;
     }
-    #printArea .print-month-head h2{
+    .print-doc .print-month-head h2{
       font-size:12px;font-family:ui-monospace,monospace;text-transform:uppercase;
       letter-spacing:1.5px;margin:0;font-weight:700;
     }
-    #printArea .print-month-head .subtotal{font-family:ui-monospace,monospace;font-size:12px;font-weight:700;}
-    #printArea .print-month-head .subtotal.pos{color:#2c4d3c;}
-    #printArea .print-month-head .subtotal.neg{color:#a4462c;}
+    .print-doc .print-month-head .subtotal{font-family:ui-monospace,monospace;font-size:12px;font-weight:700;}
+    .print-doc .print-month-head .subtotal.pos{color:#2c4d3c;}
+    .print-doc .print-month-head .subtotal.neg{color:#a4462c;}
 
-    #printArea table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:4px;}
-    #printArea th{
+    .print-doc table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:4px;}
+    .print-doc th{
       text-align:left;font-family:ui-monospace,monospace;font-size:9px;text-transform:uppercase;
       letter-spacing:0.5px;color:#6b6455;padding:5px 8px;border-bottom:1px solid #2a2620;
     }
-    #printArea td{padding:5px 8px;border-bottom:1px solid #d8d2c2;vertical-align:top;}
-    #printArea tbody tr:nth-child(even) td{background:#f6f3ec;}
-    #printArea td.amt{text-align:right;font-family:ui-monospace,monospace;white-space:nowrap;font-weight:600;}
-    #printArea td.amt.in{color:#2c4d3c;}
-    #printArea td.amt.out{color:#a4462c;}
+    .print-doc td{padding:5px 8px;border-bottom:1px solid #d8d2c2;vertical-align:top;}
+    .print-doc tbody tr:nth-child(even) td{background:#f6f3ec;}
+    .print-doc td.amt{text-align:right;font-family:ui-monospace,monospace;white-space:nowrap;font-weight:600;}
+    .print-doc td.amt.in{color:#2c4d3c;}
+    .print-doc td.amt.out{color:#a4462c;}
 
-    #printArea .print-footer{
+    .print-doc .print-footer{
       margin-top:40px;padding-top:16px;border-top:1px solid #d8d2c2;
       display:flex;gap:40px;break-inside:avoid;
     }
-    #printArea .sign-line{flex:1;font-family:ui-monospace,monospace;font-size:9px;
+    .print-doc .sign-line{flex:1;font-family:ui-monospace,monospace;font-size:9px;
       text-transform:uppercase;letter-spacing:0.5px;color:#6b6455;}
-    #printArea .sign-line .line{border-bottom:1px solid #2a2620;height:36px;}
+    .print-doc .sign-line .line{border-bottom:1px solid #2a2620;height:36px;}
+
+    /* Invoice-specific print elements */
+    .print-doc .print-company-header{
+      display:flex;justify-content:space-between;align-items:flex-start;
+      border-bottom:2px solid #2a2620;padding-bottom:14px;margin-bottom:20px;
+    }
+    .print-doc .print-company-header .company-name{font-size:18px;font-style:italic;}
+    .print-doc .print-company-header .company-info{
+      font-family:ui-monospace,monospace;font-size:10px;color:#6b6455;line-height:1.6;margin-top:4px;
+    }
+    .print-doc .print-invoice-meta{text-align:right;font-family:ui-monospace,monospace;font-size:11px;}
+    .print-doc .print-invoice-meta .invoice-no{font-size:16px;font-weight:700;color:#2a2620;}
+    .print-doc .print-bill-to{margin-bottom:20px;}
+    .print-doc .print-bill-to .label{
+      font-family:ui-monospace,monospace;font-size:9px;text-transform:uppercase;
+      letter-spacing:1px;color:#6b6455;
+    }
+    .print-doc .print-bill-to .client-name{font-size:15px;margin-top:2px;}
+    .print-doc .print-invoice-totals{
+      margin-left:auto;width:260px;margin-top:10px;font-family:ui-monospace,monospace;font-size:12px;
+    }
+    .print-doc .print-invoice-totals .row{display:flex;justify-content:space-between;padding:4px 0;}
+    .print-doc .print-invoice-totals .row.grand{
+      border-top:1.5px solid #2a2620;margin-top:4px;padding-top:8px;font-size:14px;font-weight:700;
+    }
+    .print-doc .print-notes{
+      margin-top:24px;font-size:12px;color:#6b6455;font-style:italic;
+    }
   }
+
+  .company-block{
+    display:flex;align-items:center;gap:12px;
+    padding-bottom:16px;margin-bottom:16px;border-bottom:1px solid var(--rule);
+  }
+  .company-logo{width:44px;height:auto;flex-shrink:0;}
+  .company-details{display:flex;flex-direction:column;gap:1px;}
+  .company-details strong{font-size:14px;font-weight:600;}
+  .company-details span{font-family:ui-monospace,monospace;font-size:10px;color:var(--ink-soft);}
+
+  .invoice-items{margin:16px 0;}
+  .invoice-items-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .invoice-items-head h3{
+    font-size:11px;font-family:ui-monospace,monospace;text-transform:uppercase;
+    letter-spacing:1px;color:var(--ink-soft);margin:0;
+  }
+  .item-card{
+    border:1px solid var(--rule);border-radius:2px;padding:12px;margin-bottom:10px;
+    background:var(--paper);position:relative;
+  }
+  .item-card-grid{
+    display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;
+  }
+  .item-card-grid .field{margin-bottom:0;}
+  .item-card-grid .field.full{grid-column:1 / -1;}
+  .item-remove-btn{
+    position:absolute;top:8px;right:8px;background:none;border:none;color:var(--ink-soft);
+    cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;
+  }
+  .item-remove-btn:hover{color:var(--rust);}
+  .item-line-total{
+    margin-top:8px;text-align:right;font-family:ui-monospace,monospace;font-size:12px;
+    font-weight:600;color:var(--ink-soft);
+  }
+
+  .vat-toggle-row{
+    display:flex;align-items:center;gap:8px;font-family:ui-monospace,monospace;
+    font-size:12px;color:var(--ink-soft);margin-bottom:14px;
+  }
+  .vat-toggle-row label{display:flex;align-items:center;gap:6px;flex:1;}
+  .vat-toggle-row input[type="number"]{
+    width:56px;border:none;border-bottom:1px solid var(--rule);background:transparent;
+    font-family:inherit;font-size:inherit;padding:2px;
+  }
+
+  .invoice-totals{
+    border:1px solid var(--rule);background:var(--card);padding:12px 16px;margin-bottom:14px;
+  }
+  .totals-row{
+    display:flex;justify-content:space-between;font-family:ui-monospace,monospace;
+    font-size:12px;color:var(--ink-soft);padding:3px 0;
+  }
+  .totals-row.grand{
+    border-top:1px solid var(--rule);margin-top:4px;padding-top:8px;
+    font-size:15px;font-weight:700;color:var(--ink);font-family:'Georgia',serif;
+  }
+
+  .invoice-entry{
+    padding:14px 0;border-bottom:1px solid var(--rule);
+  }
+  .invoice-entry .row1{display:flex;justify-content:space-between;align-items:baseline;}
+  .invoice-entry .inv-no{
+    font-family:ui-monospace,monospace;font-size:11px;color:var(--ink-soft);
+    text-transform:uppercase;letter-spacing:0.5px;
+  }
+  .invoice-entry .client{font-size:16px;margin-top:2px;}
+  .invoice-entry .total{font-family:ui-monospace,monospace;font-size:15px;font-weight:700;}
+  .invoice-entry .row2{
+    display:flex;justify-content:space-between;align-items:center;margin-top:6px;
+  }
+  .invoice-entry .meta{font-family:ui-monospace,monospace;font-size:10px;color:var(--ink-soft);}
+  .invoice-entry .invoice-actions{display:flex;gap:10px;}
+  .invoice-entry .invoice-actions button{
+    background:none;border:none;color:var(--green-deep);cursor:pointer;
+    font-family:ui-monospace,monospace;font-size:10px;text-transform:uppercase;
+    letter-spacing:0.5px;text-decoration:underline;padding:0;
+  }
+  .invoice-entry .invoice-actions button.danger{color:var(--rust);}
 
   .toast{
     position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);
@@ -355,6 +461,16 @@
     text-decoration:underline;padding:0;
   }
   .sheets-bar button.danger{color:var(--rust);}
+
+  .tabs{
+    display:flex;border-bottom:1px solid var(--rule);background:var(--card);
+  }
+  .tab-btn{
+    flex:1;padding:12px 0;background:none;border:none;cursor:pointer;
+    font-family:ui-monospace,monospace;font-size:11px;letter-spacing:1px;
+    text-transform:uppercase;color:var(--ink-soft);border-bottom:2px solid transparent;
+  }
+  .tab-btn.active{color:var(--ink);border-bottom-color:var(--green);font-weight:600;}
 </style>
 </head>
 <body>
@@ -378,7 +494,12 @@
   </div>
 </div>
 
-<main>
+<div class="tabs">
+  <button class="tab-btn active" id="tabBtnLedger" data-tab="ledger">Ledger</button>
+  <button class="tab-btn" id="tabBtnInvoices" data-tab="invoices">Invoices</button>
+</div>
+
+<main id="tabLedger">
   <div class="entry-form">
     <div class="type-toggle">
       <button id="btnOut" class="active out">Money Out</button>
@@ -436,6 +557,69 @@
   <div class="empty" id="emptyState" style="display:none;">No entries yet. Add your first one above.</div>
 </main>
 
+<main id="tabInvoices" style="display:none;">
+  <div class="entry-form">
+    <div class="company-block">
+      <img class="company-logo" id="companyLogo" alt="Inter Diesel Works logo">
+      <div class="company-details">
+        <strong id="companyName">Inter Diesel Works LTD</strong>
+        <span id="companyAddress">Mombasa, Lumumba Road, Opp. Total Petrol Station</span>
+        <span id="companyPhone">+254 701002233</span>
+        <span id="companyEmail">info@interdieselworks.co.ke</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Invoice #</label>
+      <input type="text" id="invNumber" readonly>
+    </div>
+
+    <div class="field">
+      <label>Client</label>
+      <input type="text" id="invClient" placeholder="Client / company name">
+    </div>
+
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="invDate">
+    </div>
+
+    <div class="invoice-items">
+      <div class="invoice-items-head">
+        <h3>GPS Tracker Items</h3>
+        <button type="button" class="export-link" id="btnAddItem">+ Add Item</button>
+      </div>
+      <div id="invoiceItemRows"></div>
+    </div>
+
+    <div class="field">
+      <label>Notes (optional)</label>
+      <textarea id="invNotes" placeholder="e.g. warranty terms, payment instructions"></textarea>
+    </div>
+
+    <div class="vat-toggle-row">
+      <label><input type="checkbox" id="invVatEnabled"> Include VAT</label>
+      <input type="number" id="invVatRate" value="16" min="0" step="0.1" disabled> %
+    </div>
+
+    <div class="invoice-totals">
+      <div class="totals-row"><span>Subtotal</span><span id="invSubtotal">KSh 0.00</span></div>
+      <div class="totals-row" id="invVatRow" style="display:none;"><span>VAT</span><span id="invVatAmount">KSh 0.00</span></div>
+      <div class="totals-row grand"><span>Total</span><span id="invGrandTotal">KSh 0.00</span></div>
+    </div>
+
+    <button class="save-btn in" id="btnSaveInvoice">Save Invoice</button>
+    <button type="button" class="cancel-edit-btn" id="btnCancelInvoiceEdit">Cancel edit</button>
+  </div>
+
+  <div class="ledger-head">
+    <h2>Invoices</h2>
+  </div>
+
+  <div id="invoiceList"></div>
+  <div class="empty" id="invoiceEmptyState" style="display:none;">No invoices yet. Create your first one above.</div>
+</main>
+
 <div class="toast" id="toast"></div>
 
 <div class="lightbox" id="lightbox">
@@ -462,7 +646,7 @@
   </div>
 </div>
 
-<div id="printArea">
+<div id="printArea" class="print-doc">
   <div class="print-eyebrow">Running Ledger — Printed Statement</div>
   <h1>Petty Cash Ledger</h1>
   <div class="print-meta" id="printMeta"></div>
@@ -471,6 +655,44 @@
   <div class="print-footer">
     <div class="sign-line">Prepared by<div class="line"></div></div>
     <div class="sign-line">Approved by<div class="line"></div></div>
+  </div>
+</div>
+
+<div id="invoicePrintArea" class="print-doc">
+  <div class="print-company-header">
+    <div style="display:flex;gap:12px;align-items:flex-start;">
+      <img id="printCompanyLogo" alt="Inter Diesel Works logo" style="width:48px;height:auto;">
+      <div>
+        <div class="company-name" id="printCompanyName">Inter Diesel Works LTD</div>
+        <div class="company-info" id="printCompanyInfo"></div>
+      </div>
+    </div>
+    <div class="print-invoice-meta">
+      <div class="print-eyebrow">Invoice</div>
+      <div class="invoice-no" id="printInvoiceNo"></div>
+      <div id="printInvoiceDate"></div>
+    </div>
+  </div>
+
+  <div class="print-bill-to">
+    <div class="label">Bill To</div>
+    <div class="client-name" id="printInvoiceClient"></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Description</th><th>Vehicle</th><th>IMEI</th><th>SIM Card</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Unit Price</th><th style="text-align:right;">Amount</th></tr>
+    </thead>
+    <tbody id="printInvoiceItems"></tbody>
+  </table>
+
+  <div class="print-invoice-totals" id="printInvoiceTotals"></div>
+
+  <div class="print-notes" id="printInvoiceNotes"></div>
+
+  <div class="print-footer">
+    <div class="sign-line">Prepared by<div class="line"></div></div>
+    <div class="sign-line">Client signature<div class="line"></div></div>
   </div>
 </div>
 
@@ -1225,8 +1447,381 @@ document.getElementById('btnExportPdf').addEventListener('click', () => {
     </div>
   `).join('');
 
+  document.getElementById('printArea').style.display = '';
+  document.getElementById('invoicePrintArea').style.display = 'none';
   window.print();
 });
+
+// ── Invoices ──────────────────────────────────────────────────────────────
+
+const COMPANY_LOGO = 'data:image/png;base64,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';
+
+const COMPANY = {
+  name: 'Inter Diesel Works LTD',
+  address: 'Mombasa, Lumumba Road, Opp. Total Petrol Station',
+  phone: '+254 701002233',
+  email: 'info@interdieselworks.co.ke'
+};
+
+const INVOICES_KEY = 'invoices';
+let invoices = [];
+let editingInvoiceId = null;
+let draftItems = [];
+
+function loadInvoices(){
+  try{
+    const raw = localStorage.getItem(INVOICES_KEY);
+    invoices = raw ? JSON.parse(raw) : [];
+  }catch(e){
+    invoices = [];
+  }
+  renderInvoiceList();
+}
+
+function saveInvoices(){
+  try{
+    localStorage.setItem(INVOICES_KEY, JSON.stringify(invoices));
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+// "Peek" shows a preview number without consuming it; only committing at
+// save time avoids burning invoice numbers on cancelled edits or tab switches.
+function peekInvoiceNumber(){
+  const counter = parseInt(localStorage.getItem('invoice-counter') || '0', 10) + 1;
+  return 'INV-' + String(counter).padStart(4, '0');
+}
+function commitInvoiceNumber(){
+  const counter = parseInt(localStorage.getItem('invoice-counter') || '0', 10) + 1;
+  localStorage.setItem('invoice-counter', String(counter));
+  return 'INV-' + String(counter).padStart(4, '0');
+}
+
+function newItemRow(){
+  return {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    description: 'GPS Tracker Installation',
+    vehicle: '',
+    imei: '',
+    simCard: '',
+    qty: 1,
+    unitPrice: ''
+  };
+}
+
+function computeTotals(items, vatEnabled, vatRate){
+  const subtotal = items.reduce((sum, i) => sum + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0);
+  const vatAmount = vatEnabled ? subtotal * (vatRate / 100) : 0;
+  return { subtotal, vatAmount, grandTotal: subtotal + vatAmount };
+}
+
+function recalcInvoiceTotals(){
+  const vatEnabled = document.getElementById('invVatEnabled').checked;
+  const vatRate = parseFloat(document.getElementById('invVatRate').value) || 0;
+  const totals = computeTotals(draftItems, vatEnabled, vatRate);
+
+  document.getElementById('invSubtotal').textContent = fmt(totals.subtotal);
+  document.getElementById('invVatRow').style.display = vatEnabled ? 'flex' : 'none';
+  document.getElementById('invVatAmount').textContent = fmt(totals.vatAmount);
+  document.getElementById('invGrandTotal').textContent = fmt(totals.grandTotal);
+
+  return totals;
+}
+
+function updateItemLineTotal(item){
+  const el = document.querySelector(`.item-line-total[data-item-id="${item.id}"]`);
+  if(el) el.textContent = fmt((Number(item.qty) || 0) * (Number(item.unitPrice) || 0));
+}
+
+function renderItemRows(){
+  const container = document.getElementById('invoiceItemRows');
+  container.innerHTML = draftItems.map(item => `
+    <div class="item-card" data-item-id="${item.id}">
+      <button type="button" class="item-remove-btn" data-item-id="${item.id}" title="Remove item">×</button>
+      <div class="item-card-grid">
+        <div class="field full">
+          <label>Description</label>
+          <input type="text" class="item-desc" data-item-id="${item.id}" value="${escapeHtml(item.description)}">
+        </div>
+        <div class="field">
+          <label>Vehicle Reg</label>
+          <input type="text" class="item-vehicle" data-item-id="${item.id}" value="${escapeHtml(item.vehicle)}" placeholder="e.g. KDA 123X">
+        </div>
+        <div class="field">
+          <label>IMEI</label>
+          <input type="text" class="item-imei" data-item-id="${item.id}" value="${escapeHtml(item.imei)}" placeholder="15-digit IMEI">
+        </div>
+        <div class="field">
+          <label>SIM Card No.</label>
+          <input type="text" class="item-sim" data-item-id="${item.id}" value="${escapeHtml(item.simCard)}">
+        </div>
+        <div class="field">
+          <label>Qty</label>
+          <input type="number" class="item-qty" data-item-id="${item.id}" value="${item.qty}" min="1">
+        </div>
+        <div class="field">
+          <label>Unit Price (KSh)</label>
+          <input type="number" class="item-price" data-item-id="${item.id}" value="${item.unitPrice}" step="0.01" placeholder="0.00">
+        </div>
+      </div>
+      <div class="item-line-total" data-item-id="${item.id}">${fmt((Number(item.qty) || 0) * (Number(item.unitPrice) || 0))}</div>
+    </div>
+  `).join('');
+  recalcInvoiceTotals();
+}
+
+document.getElementById('invoiceItemRows').addEventListener('input', (e) => {
+  const id = e.target.dataset.itemId;
+  if(!id) return;
+  const item = draftItems.find(i => i.id === id);
+  if(!item) return;
+  if(e.target.classList.contains('item-desc')) item.description = e.target.value;
+  else if(e.target.classList.contains('item-vehicle')) item.vehicle = e.target.value;
+  else if(e.target.classList.contains('item-imei')) item.imei = e.target.value;
+  else if(e.target.classList.contains('item-sim')) item.simCard = e.target.value;
+  else if(e.target.classList.contains('item-qty')) item.qty = parseFloat(e.target.value) || 0;
+  else if(e.target.classList.contains('item-price')) item.unitPrice = parseFloat(e.target.value) || 0;
+  updateItemLineTotal(item);
+  recalcInvoiceTotals();
+});
+
+document.getElementById('invoiceItemRows').addEventListener('click', (e) => {
+  const btn = e.target.closest('.item-remove-btn');
+  if(!btn) return;
+  draftItems = draftItems.filter(i => i.id !== btn.dataset.itemId);
+  renderItemRows();
+});
+
+document.getElementById('btnAddItem').addEventListener('click', () => {
+  draftItems.push(newItemRow());
+  renderItemRows();
+});
+
+document.getElementById('invVatEnabled').addEventListener('change', (e) => {
+  document.getElementById('invVatRate').disabled = !e.target.checked;
+  recalcInvoiceTotals();
+});
+document.getElementById('invVatRate').addEventListener('input', recalcInvoiceTotals);
+
+function resetInvoiceForm(){
+  editingInvoiceId = null;
+  document.getElementById('invNumber').value = peekInvoiceNumber();
+  document.getElementById('invClient').value = '';
+  document.getElementById('invDate').value = dateStrFromTs(Date.now());
+  document.getElementById('invNotes').value = '';
+  document.getElementById('invVatEnabled').checked = false;
+  document.getElementById('invVatRate').value = 16;
+  document.getElementById('invVatRate').disabled = true;
+  draftItems = [newItemRow()];
+  renderItemRows();
+  document.getElementById('btnSaveInvoice').textContent = 'Save Invoice';
+  document.getElementById('btnCancelInvoiceEdit').style.display = 'none';
+}
+
+function startEditInvoice(id){
+  const inv = invoices.find(i => i.id === id);
+  if(!inv) return;
+
+  editingInvoiceId = id;
+  document.getElementById('invNumber').value = inv.invoiceNo;
+  document.getElementById('invClient').value = inv.client;
+  document.getElementById('invDate').value = dateStrFromTs(inv.ts);
+  document.getElementById('invNotes').value = inv.notes || '';
+  document.getElementById('invVatEnabled').checked = inv.vatEnabled;
+  document.getElementById('invVatRate').value = inv.vatRate;
+  document.getElementById('invVatRate').disabled = !inv.vatEnabled;
+  draftItems = inv.items.map(i => ({ ...i }));
+  renderItemRows();
+
+  document.getElementById('btnSaveInvoice').textContent = 'Update Invoice';
+  document.getElementById('btnCancelInvoiceEdit').style.display = 'block';
+  document.querySelector('#tabInvoices .entry-form').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+document.getElementById('btnCancelInvoiceEdit').addEventListener('click', resetInvoiceForm);
+
+document.getElementById('btnSaveInvoice').addEventListener('click', () => {
+  const client = document.getElementById('invClient').value.trim();
+  const dateStr = document.getElementById('invDate').value;
+  const notes = document.getElementById('invNotes').value.trim();
+  const vatEnabled = document.getElementById('invVatEnabled').checked;
+  const vatRate = parseFloat(document.getElementById('invVatRate').value) || 0;
+
+  if(!client){
+    showToast('Enter a client name');
+    return;
+  }
+
+  const validItems = draftItems
+    .filter(i => i.description.trim() && Number(i.qty) > 0 && Number(i.unitPrice) >= 0)
+    .map(i => ({ ...i, qty: Number(i.qty), unitPrice: Number(i.unitPrice) }));
+
+  if(validItems.length === 0){
+    showToast('Add at least one item with a description, quantity, and price');
+    return;
+  }
+
+  const totals = computeTotals(validItems, vatEnabled, vatRate);
+
+  if(editingInvoiceId){
+    const idx = invoices.findIndex(i => i.id === editingInvoiceId);
+    if(idx === -1){
+      resetInvoiceForm();
+      return;
+    }
+    const original = invoices[idx];
+    const ts = combineDateAndTime(dateStr, original.ts);
+    invoices[idx] = {
+      ...original,
+      client, notes, vatEnabled, vatRate,
+      items: validItems,
+      subtotal: totals.subtotal,
+      vatAmount: totals.vatAmount,
+      total: totals.grandTotal,
+      ts
+    };
+
+    if(!saveInvoices()){
+      invoices[idx] = original;
+      showToast('Storage full — try removing old invoices');
+      return;
+    }
+    showToast('Invoice updated');
+  }else{
+    const invoiceNo = commitInvoiceNumber();
+    const ts = combineDateAndTime(dateStr, Date.now());
+    invoices.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      invoiceNo, client, notes, vatEnabled, vatRate,
+      items: validItems,
+      subtotal: totals.subtotal,
+      vatAmount: totals.vatAmount,
+      total: totals.grandTotal,
+      ts
+    });
+
+    if(!saveInvoices()){
+      invoices.pop();
+      showToast('Storage full — try removing old invoices');
+      return;
+    }
+    showToast('Invoice saved');
+  }
+
+  resetInvoiceForm();
+  renderInvoiceList();
+});
+
+function renderInvoiceList(){
+  const list = document.getElementById('invoiceList');
+  const empty = document.getElementById('invoiceEmptyState');
+  list.innerHTML = '';
+
+  if(invoices.length === 0){
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  const sorted = [...invoices].sort((a,b) => b.ts - a.ts);
+  sorted.forEach(inv => {
+    const div = document.createElement('div');
+    div.className = 'invoice-entry';
+    div.innerHTML = `
+      <div class="row1">
+        <div>
+          <div class="inv-no">${escapeHtml(inv.invoiceNo)}</div>
+          <div class="client">${escapeHtml(inv.client)}</div>
+        </div>
+        <div class="total">${fmt(inv.total)}</div>
+      </div>
+      <div class="row2">
+        <span class="meta">${dateStrFromTs(inv.ts)} · ${inv.items.length} item${inv.items.length === 1 ? '' : 's'}${inv.vatEnabled ? ' · VAT incl.' : ''}</span>
+        <div class="invoice-actions">
+          <button type="button" class="inv-print-btn" data-id="${inv.id}">Print</button>
+          <button type="button" class="inv-edit-btn" data-id="${inv.id}">Edit</button>
+          <button type="button" class="inv-delete-btn danger" data-id="${inv.id}">Delete</button>
+        </div>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+document.getElementById('invoiceList').addEventListener('click', (e) => {
+  const printBtn = e.target.closest('.inv-print-btn');
+  if(printBtn){ printInvoice(printBtn.dataset.id); return; }
+
+  const editBtn = e.target.closest('.inv-edit-btn');
+  if(editBtn){ startEditInvoice(editBtn.dataset.id); return; }
+
+  const delBtn = e.target.closest('.inv-delete-btn');
+  if(delBtn){
+    const id = delBtn.dataset.id;
+    if(confirm('Delete this invoice? This cannot be undone.')){
+      if(editingInvoiceId === id) resetInvoiceForm();
+      invoices = invoices.filter(i => i.id !== id);
+      saveInvoices();
+      renderInvoiceList();
+      showToast('Invoice deleted');
+    }
+  }
+});
+
+function printInvoice(id){
+  const inv = invoices.find(i => i.id === id);
+  if(!inv) return;
+
+  document.getElementById('printCompanyName').textContent = COMPANY.name;
+  document.getElementById('printCompanyInfo').innerHTML =
+    `${escapeHtml(COMPANY.address)}<br>${escapeHtml(COMPANY.phone)}<br>${escapeHtml(COMPANY.email)}`;
+  document.getElementById('printInvoiceNo').textContent = inv.invoiceNo;
+  document.getElementById('printInvoiceDate').textContent = dateStrFromTs(inv.ts);
+  document.getElementById('printInvoiceClient').textContent = inv.client;
+
+  document.getElementById('printInvoiceItems').innerHTML = inv.items.map(i => `
+    <tr>
+      <td>${escapeHtml(i.description)}</td>
+      <td>${escapeHtml(i.vehicle)}</td>
+      <td>${escapeHtml(i.imei)}</td>
+      <td>${escapeHtml(i.simCard)}</td>
+      <td style="text-align:right;">${i.qty}</td>
+      <td style="text-align:right;">${fmt(i.unitPrice)}</td>
+      <td style="text-align:right;font-weight:600;">${fmt(i.qty * i.unitPrice)}</td>
+    </tr>
+  `).join('');
+
+  let totalsHtml = `<div class="row"><span>Subtotal</span><span>${fmt(inv.subtotal)}</span></div>`;
+  if(inv.vatEnabled){
+    totalsHtml += `<div class="row"><span>VAT (${inv.vatRate}%)</span><span>${fmt(inv.vatAmount)}</span></div>`;
+  }
+  totalsHtml += `<div class="row grand"><span>Total</span><span>${fmt(inv.total)}</span></div>`;
+  document.getElementById('printInvoiceTotals').innerHTML = totalsHtml;
+
+  document.getElementById('printInvoiceNotes').textContent = inv.notes || '';
+
+  document.getElementById('invoicePrintArea').style.display = '';
+  document.getElementById('printArea').style.display = 'none';
+  window.print();
+}
+
+function switchTab(tab){
+  document.getElementById('tabLedger').style.display = tab === 'ledger' ? '' : 'none';
+  document.getElementById('tabInvoices').style.display = tab === 'invoices' ? '' : 'none';
+  document.getElementById('tabBtnLedger').classList.toggle('active', tab === 'ledger');
+  document.getElementById('tabBtnInvoices').classList.toggle('active', tab === 'invoices');
+}
+document.getElementById('tabBtnLedger').addEventListener('click', () => switchTab('ledger'));
+document.getElementById('tabBtnInvoices').addEventListener('click', () => switchTab('invoices'));
+
+document.getElementById('companyLogo').src = COMPANY_LOGO;
+document.getElementById('printCompanyLogo').src = COMPANY_LOGO;
+
+resetInvoiceForm();
+loadInvoices();
+switchTab('ledger');
 
 setType('out');
 document.getElementById('fDate').value = dateStrFromTs(Date.now());
