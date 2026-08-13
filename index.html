@@ -265,11 +265,17 @@
 
   .print-doc{display:none;}
   @media print{
-    body *{visibility:hidden;}
-    .print-doc, .print-doc *{visibility:visible;}
+    /* display:none (not visibility:hidden) so hidden content doesn't still
+       occupy layout height and spill onto a spurious blank second page. */
+    body > *:not(.print-doc){display:none;}
     .print-doc{
-      display:block;position:absolute;left:0;top:0;width:100%;padding:28px;
+      display:block;position:relative;padding:34px 28px 28px;
+      border:1px solid #d8d2c2;
       font-family:'Georgia','Iowan Old Style',serif;color:#2a2620;
+    }
+    .print-doc::before{
+      content:"";position:absolute;top:0;left:0;right:0;height:6px;
+      background:#a4462c;
     }
     .print-doc .print-eyebrow{
       font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:9px;letter-spacing:2px;
@@ -289,7 +295,7 @@
       letter-spacing:0.5px;color:#6b6455;
     }
     .print-doc .summary-item .value{
-      display:block;font-size:17px;font-weight:700;color:#2a2620;
+      display:block;font-size:17px;font-weight:700;color:#2a2620;text-transform:none;
       font-family:'Georgia',serif;letter-spacing:-0.3px;margin-top:3px;
     }
     .print-doc .summary-item .value.pos{color:#2c4d3c;}
@@ -330,26 +336,29 @@
     /* Invoice-specific print elements */
     .print-doc .print-company-header{
       display:flex;justify-content:space-between;align-items:flex-start;
-      border-bottom:2px solid #2a2620;padding-bottom:14px;margin-bottom:20px;
+      border-bottom:2px solid #a4462c;padding-bottom:16px;margin-bottom:22px;
     }
-    .print-doc .print-company-header .company-name{font-size:18px;font-style:italic;}
+    .print-doc .print-company-header .company-name{font-size:19px;font-style:italic;}
     .print-doc .print-company-header .company-info{
       font-family:ui-monospace,monospace;font-size:10px;color:#6b6455;line-height:1.6;margin-top:4px;
     }
     .print-doc .print-invoice-meta{text-align:right;font-family:ui-monospace,monospace;font-size:11px;}
-    .print-doc .print-invoice-meta .invoice-no{font-size:16px;font-weight:700;color:#2a2620;}
+    .print-doc .print-invoice-meta .print-eyebrow{color:#a4462c;font-weight:700;}
+    .print-doc .print-invoice-meta .invoice-no{font-size:21px;font-weight:700;color:#2a2620;margin-top:2px;}
     .print-doc .print-bill-to{margin-bottom:20px;}
     .print-doc .print-bill-to .label{
       font-family:ui-monospace,monospace;font-size:9px;text-transform:uppercase;
       letter-spacing:1px;color:#6b6455;
     }
-    .print-doc .print-bill-to .client-name{font-size:15px;margin-top:2px;}
+    .print-doc .print-bill-to .client-name{font-size:16px;margin-top:2px;font-weight:600;}
     .print-doc .print-invoice-totals{
-      margin-left:auto;width:260px;margin-top:10px;font-family:ui-monospace,monospace;font-size:12px;
+      margin-left:auto;width:280px;margin-top:16px;font-family:ui-monospace,monospace;font-size:12px;
+      border:1px solid #d8d2c2;background:#fffdf7;padding:14px 16px;
     }
     .print-doc .print-invoice-totals .row{display:flex;justify-content:space-between;padding:4px 0;}
     .print-doc .print-invoice-totals .row.grand{
-      border-top:1.5px solid #2a2620;margin-top:4px;padding-top:8px;font-size:14px;font-weight:700;
+      border-top:1.5px solid #a4462c;margin-top:6px;padding-top:9px;
+      font-size:16px;font-weight:700;color:#a4462c;
     }
     .print-doc .print-notes{
       margin-top:24px;font-size:12px;color:#6b6455;font-style:italic;
