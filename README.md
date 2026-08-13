@@ -63,6 +63,11 @@ The Invoices tab lets you build a GPS tracker installation invoice:
 - **Print** on an invoice builds a styled, print-only statement (company
   header + logo, bill-to, itemized table, totals, signature lines) and
   opens the browser print dialog — choose "Save as PDF" for a PDF copy.
+- **Client statements**: below the invoice list, a dropdown (populated from
+  the distinct client names across all saved invoices) plus **Print
+  Statement** generates a one-page summary of every invoice for that
+  client — invoice #, date, vehicles, item count, amount — with an
+  invoice count and grand total at the bottom.
 
 ## Google Sheets sync (optional)
 

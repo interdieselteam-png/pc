@@ -443,6 +443,15 @@
   }
   .invoice-entry .invoice-actions button.danger{color:var(--rust);}
 
+  .statement-bar{
+    display:flex;align-items:center;gap:12px;margin-bottom:14px;
+    padding:10px 12px;border:1px solid var(--rule);background:var(--card);
+  }
+  .statement-bar select{
+    flex:1;border:none;border-bottom:1px solid var(--rule);background:transparent;
+    font-family:'Georgia',serif;font-size:14px;padding:4px 2px;color:var(--ink);
+  }
+
   .toast{
     position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);
     background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:20px;
@@ -625,6 +634,11 @@
     <h2>Invoices</h2>
   </div>
 
+  <div class="statement-bar" id="statementBar" style="display:none;">
+    <select id="statementClientSelect"></select>
+    <button type="button" class="export-link" id="btnPrintStatement">Print Statement</button>
+  </div>
+
   <div id="invoiceList"></div>
   <div class="empty" id="invoiceEmptyState" style="display:none;">No invoices yet. Create your first one above.</div>
 </main>
@@ -698,6 +712,41 @@
   <div class="print-invoice-totals" id="printInvoiceTotals"></div>
 
   <div class="print-notes" id="printInvoiceNotes"></div>
+
+  <div class="print-footer">
+    <div class="sign-line">Prepared by<div class="line"></div></div>
+    <div class="sign-line">Client signature<div class="line"></div></div>
+  </div>
+</div>
+
+<div id="clientStatementPrintArea" class="print-doc">
+  <div class="print-company-header">
+    <div style="display:flex;gap:12px;align-items:flex-start;">
+      <img id="stmtCompanyLogo" alt="Inter Diesel Works logo" style="width:48px;height:auto;">
+      <div>
+        <div class="company-name" id="stmtCompanyName">Inter Diesel Works LTD</div>
+        <div class="company-info" id="stmtCompanyInfo"></div>
+      </div>
+    </div>
+    <div class="print-invoice-meta">
+      <div class="print-eyebrow">Client Statement</div>
+      <div id="stmtMeta"></div>
+    </div>
+  </div>
+
+  <div class="print-bill-to">
+    <div class="label">Statement For</div>
+    <div class="client-name" id="stmtClient"></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Invoice #</th><th>Date</th><th>Vehicles</th><th style="text-align:right;">Items</th><th style="text-align:right;">Amount</th></tr>
+    </thead>
+    <tbody id="stmtInvoiceRows"></tbody>
+  </table>
+
+  <div class="print-invoice-totals" id="stmtTotals"></div>
 
   <div class="print-footer">
     <div class="sign-line">Prepared by<div class="line"></div></div>
@@ -898,6 +947,13 @@ function escapeHtml(s){
   const div = document.createElement('div');
   div.textContent = s;
   return div.innerHTML;
+}
+
+const PRINT_DOC_IDS = ['printArea', 'invoicePrintArea', 'clientStatementPrintArea'];
+function showPrintDoc(activeId){
+  PRINT_DOC_IDS.forEach(id => {
+    document.getElementById(id).style.display = id === activeId ? '' : 'none';
+  });
 }
 
 function loadEntries(){
@@ -1456,8 +1512,7 @@ document.getElementById('btnExportPdf').addEventListener('click', () => {
     </div>
   `).join('');
 
-  document.getElementById('printArea').style.display = '';
-  document.getElementById('invoicePrintArea').style.display = 'none';
+  showPrintDoc('printArea');
   window.print();
 });
 
@@ -1727,6 +1782,7 @@ function renderInvoiceList(){
   const list = document.getElementById('invoiceList');
   const empty = document.getElementById('invoiceEmptyState');
   list.innerHTML = '';
+  refreshStatementClientOptions();
 
   if(invoices.length === 0){
     empty.style.display = 'block';
@@ -1811,10 +1867,60 @@ function printInvoice(id){
 
   document.getElementById('printInvoiceNotes').textContent = inv.notes || '';
 
-  document.getElementById('invoicePrintArea').style.display = '';
-  document.getElementById('printArea').style.display = 'none';
+  showPrintDoc('invoicePrintArea');
   window.print();
 }
+
+function refreshStatementClientOptions(){
+  const bar = document.getElementById('statementBar');
+  const select = document.getElementById('statementClientSelect');
+
+  if(invoices.length === 0){
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = 'flex';
+
+  const clients = [...new Set(invoices.map(i => i.client))].sort((a, b) => a.localeCompare(b));
+  const previousValue = select.value;
+  select.innerHTML = clients.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  if(clients.includes(previousValue)) select.value = previousValue;
+}
+
+document.getElementById('btnPrintStatement').addEventListener('click', () => {
+  const client = document.getElementById('statementClientSelect').value;
+  if(!client) return;
+
+  const clientInvoices = invoices.filter(i => i.client === client).sort((a, b) => a.ts - b.ts);
+  const total = clientInvoices.reduce((sum, i) => sum + i.total, 0);
+
+  document.getElementById('stmtCompanyName').textContent = COMPANY.name;
+  document.getElementById('stmtCompanyInfo').innerHTML =
+    `${escapeHtml(COMPANY.address)}<br>${escapeHtml(COMPANY.phone)}<br>${escapeHtml(COMPANY.email)}`;
+  document.getElementById('stmtMeta').textContent = `Generated ${new Date().toLocaleString()}`;
+  document.getElementById('stmtClient').textContent = client;
+
+  document.getElementById('stmtInvoiceRows').innerHTML = clientInvoices.map(inv => {
+    const vehicles = [...new Set(inv.items.map(i => i.vehicle).filter(Boolean))].join(', ');
+    return `
+      <tr>
+        <td>${escapeHtml(inv.invoiceNo)}</td>
+        <td>${dateStrFromTs(inv.ts)}</td>
+        <td>${escapeHtml(vehicles)}</td>
+        <td style="text-align:right;">${inv.items.length}</td>
+        <td style="text-align:right;font-weight:600;">${fmt(inv.total)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  document.getElementById('stmtTotals').innerHTML = `
+    <div class="row"><span>Invoices</span><span>${clientInvoices.length}</span></div>
+    <div class="row grand"><span>Total</span><span>${fmt(total)}</span></div>
+  `;
+
+  showPrintDoc('clientStatementPrintArea');
+  window.print();
+});
 
 function switchTab(tab){
   document.getElementById('tabLedger').style.display = tab === 'ledger' ? '' : 'none';
@@ -1827,6 +1933,7 @@ document.getElementById('tabBtnInvoices').addEventListener('click', () => switch
 
 document.getElementById('companyLogo').src = COMPANY_LOGO;
 document.getElementById('printCompanyLogo').src = COMPANY_LOGO;
+document.getElementById('stmtCompanyLogo').src = COMPANY_LOGO;
 
 resetInvoiceForm();
 loadInvoices();
