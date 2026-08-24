@@ -68,17 +68,22 @@ The Invoices tab lets you build a GPS tracker installation invoice:
   Statement** generates a one-page summary of every invoice for that
   client — invoice #, date, vehicles, item count, amount, and payment
   status per row — with an invoice count, total, and outstanding balance.
-- **Payment proof**: each invoice in the list shows a Paid/Unpaid badge.
-  Tapping **Attach payment proof** opens the camera or file picker right
-  from the list — no need to open the edit form. Attaching a file *is*
-  what marks the invoice paid (there's no separate "mark as paid"
-  checkbox to forget); removing it reverts to unpaid. Photos are
-  downscaled/compressed automatically; PDFs and Word docs (e.g. an M-Pesa
-  or bank confirmation) are accepted too and stored as-is, up to 5MB —
-  tap the filename to open it. Payment status is invoice-only — it does
-  not create or affect any Ledger entry.
-- The Ledger's own **Receipt** field on each entry works the same way —
-  attach a photo or a document (PDF/Word), not just a camera photo.
+- **Payments, including partial payments**: each invoice tracks a list of
+  payment records rather than a single paid/unpaid flag. **Record
+  Payment** opens a small form (amount, optional note, optional proof
+  photo/document) — the amount defaults to the remaining balance, but can
+  be less for an installment. Status is computed automatically from the
+  sum of recorded payments: **Unpaid** (nothing recorded), **Partial**
+  (some but not all of the total), or **Paid** (fully covered). Every
+  payment is listed under the invoice with its date, amount, and proof
+  (if any) and can be deleted individually if entered in error. This
+  status surfaces on the invoice PDF (PAID / PARTIALLY PAID badge, plus a
+  Balance Due line when applicable) and on the client statement (per-row
+  status, plus a total Outstanding balance). Payments are invoice-only —
+  they do not create or affect any Ledger entry.
+- The Ledger's own **Receipt** field on each entry works the same way as
+  payment proof — attach a photo or a document (PDF/Word), not just a
+  camera photo.
 
 ## Google Sheets sync (optional)
 

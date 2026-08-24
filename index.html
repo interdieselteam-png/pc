@@ -281,6 +281,14 @@
     /* display:none (not visibility:hidden) so hidden content doesn't still
        occupy layout height and spill onto a spurious blank second page. */
     body > *:not(.print-doc){display:none;}
+    /* Most browsers' print dialog defaults "Background graphics" to OFF,
+       which silently strips every background-color here (accent bar, PAID
+       badge, totals boxes, alternating rows) unless forced like this. */
+    .print-doc, .print-doc *{
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      color-adjust: exact;
+    }
     .print-doc{
       display:block;position:relative;padding:34px 28px 28px;
       border:1px solid #d8d2c2;
@@ -362,6 +370,7 @@
       display:inline-block;margin-top:8px;padding:3px 10px;background:#2c4d3c;color:#fff;
       font-size:10px;font-weight:700;letter-spacing:1px;border-radius:3px;
     }
+    .print-doc .print-paid-badge.partial{background:#8a5f24;}
     .print-doc .print-bill-to{margin-bottom:20px;}
     .print-doc .print-bill-to .label{
       font-family:ui-monospace,monospace;font-size:9px;text-transform:uppercase;
@@ -461,14 +470,18 @@
   .invoice-entry .invoice-actions button.danger{color:var(--rust);}
 
   .invoice-entry .row3{
-    display:flex;align-items:center;gap:10px;margin-top:8px;
+    display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap;
   }
   .payment-badge{
     font-family:ui-monospace,monospace;font-size:9px;text-transform:uppercase;
     letter-spacing:0.5px;padding:2px 7px;border-radius:10px;flex-shrink:0;
   }
   .payment-badge.paid{background:var(--green);color:#fff;}
+  .payment-badge.partial{background:#b8863b;color:#fff;}
   .payment-badge.unpaid{background:transparent;color:var(--ink-soft);border:1px solid var(--rule);}
+  .invoice-entry .payment-summary{
+    font-family:ui-monospace,monospace;font-size:10px;color:var(--ink-soft);
+  }
   .invoice-entry .payment-thumb{
     width:28px;height:28px;object-fit:cover;border:1px solid var(--rule);
     border-radius:2px;cursor:pointer;flex-shrink:0;
@@ -479,6 +492,22 @@
     letter-spacing:0.5px;text-decoration:underline;padding:0;
   }
   .invoice-entry .row3 button.danger{color:var(--rust);}
+
+  .payment-history{
+    margin-top:8px;padding-top:8px;border-top:1px dashed var(--rule);
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .payment-history-row{
+    display:flex;align-items:center;gap:8px;font-family:ui-monospace,monospace;font-size:10px;
+    color:var(--ink-soft);
+  }
+  .payment-history-row .amt{font-weight:700;color:var(--green-deep);flex-shrink:0;}
+  .payment-history-row .note{font-style:italic;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .payment-history-row .payment-thumb{width:20px;height:20px;}
+  .payment-history-row button{
+    background:none;border:none;color:var(--rust);cursor:pointer;font-size:12px;
+    padding:0;flex-shrink:0;
+  }
 
   .statement-bar{
     display:flex;align-items:center;gap:12px;margin-bottom:14px;
@@ -679,7 +708,6 @@
 
   <div id="invoiceList"></div>
   <div class="empty" id="invoiceEmptyState" style="display:none;">No invoices yet. Create your first one above.</div>
-  <input type="file" id="paymentProofInput" accept="image/*,application/pdf,.doc,.docx" capture="environment" style="display:none;">
 </main>
 
 <div class="toast" id="toast"></div>
@@ -704,6 +732,35 @@
       <button type="button" class="save-btn in" id="btnSaveSheetsSettings">Save</button>
       <button type="button" class="link-btn" id="btnCancelSheetsSettings">Cancel</button>
       <button type="button" class="link-btn danger" id="btnClearSheetsSettings">Clear saved credentials</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="paymentModal">
+  <div class="modal-box">
+    <h3>Record Payment</h3>
+    <p id="paymentModalInfo"></p>
+    <div class="field">
+      <label>Amount (KSh)</label>
+      <input type="number" id="paymentAmount" step="0.01" min="0.01">
+    </div>
+    <div class="field">
+      <label>Note (optional)</label>
+      <input type="text" id="paymentNote" placeholder="e.g. M-Pesa part payment">
+    </div>
+    <div class="receipt-field">
+      <label style="display:block;font-family:ui-monospace,monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink-soft);margin-bottom:5px;">Proof (optional)</label>
+      <button type="button" class="receipt-btn" id="btnPaymentModalProof">📎 Attach proof</button>
+      <input type="file" id="paymentModalProofInput" accept="image/*,application/pdf,.doc,.docx" style="display:none;">
+      <div class="receipt-preview" id="paymentModalProofPreview" style="display:none;">
+        <img id="paymentModalProofImg" alt="Payment proof preview" style="display:none;">
+        <div class="doc-preview" id="paymentModalProofDoc" style="display:none;">📄 <span class="doc-name" id="paymentModalProofName"></span></div>
+        <button type="button" id="btnRemovePaymentModalProof">Remove</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="save-btn in" id="btnSavePayment">Save Payment</button>
+      <button type="button" class="link-btn" id="btnCancelPayment">Cancel</button>
     </div>
   </div>
 </div>
@@ -1651,6 +1708,35 @@ let invoices = [];
 let editingInvoiceId = null;
 let draftItems = [];
 
+// Older invoices stored a single paymentReceipt (paid/unpaid only). Convert
+// that into a one-entry payments array covering the full total, so the rest
+// of the app only ever has to deal with the payments-array shape.
+function migrateInvoicePayments(inv){
+  if(inv.payments) return false;
+  inv.payments = [];
+  if(inv.paymentReceipt){
+    inv.payments.push({
+      id: 'legacy-' + inv.id,
+      amount: inv.total,
+      ts: inv.paidAt || inv.ts,
+      proof: inv.paymentReceipt,
+      proofType: inv.paymentReceiptType || 'image/jpeg',
+      proofName: inv.paymentReceiptName || null,
+      note: ''
+    });
+  }
+  return true;
+}
+
+function computeInvoicePaymentStatus(inv){
+  const payments = inv.payments || [];
+  const amountPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+  const balance = Math.max(0, inv.total - amountPaid);
+  let status = 'unpaid';
+  if(amountPaid > 0.005) status = balance > 0.005 ? 'partial' : 'paid';
+  return { amountPaid, balance, status };
+}
+
 function loadInvoices(){
   try{
     const raw = localStorage.getItem(INVOICES_KEY);
@@ -1658,6 +1744,8 @@ function loadInvoices(){
   }catch(e){
     invoices = [];
   }
+  const migrated = invoices.map(inv => migrateInvoicePayments(inv)).some(Boolean);
+  if(migrated) saveInvoices();
   renderInvoiceList();
 }
 
@@ -1882,6 +1970,7 @@ document.getElementById('btnSaveInvoice').addEventListener('click', () => {
       subtotal: totals.subtotal,
       vatAmount: totals.vatAmount,
       total: totals.grandTotal,
+      payments: [],
       ts
     });
 
@@ -1929,16 +2018,42 @@ function renderInvoiceList(){
           <button type="button" class="inv-delete-btn danger" data-id="${inv.id}">Delete</button>
         </div>
       </div>
-      <div class="row3">
-        <span class="payment-badge ${inv.paymentReceipt ? 'paid' : 'unpaid'}">${inv.paymentReceipt ? '✓ Paid' : 'Unpaid'}</span>
-        ${inv.paymentReceipt ? (isImageAttachment(inv.paymentReceiptType)
-          ? `<img class="payment-thumb" src="${inv.paymentReceipt}" data-id="${inv.id}" alt="Payment proof thumbnail">`
-          : `<button type="button" class="payment-doc-btn" data-id="${inv.id}">📄 ${escapeHtml(inv.paymentReceiptName || 'Document')}</button>`
-        ) : ''}
-        <button type="button" class="payment-attach-btn" data-id="${inv.id}">${inv.paymentReceipt ? 'Replace proof' : '📎 Attach payment proof'}</button>
-        ${inv.paymentReceipt ? `<button type="button" class="payment-remove-btn danger" data-id="${inv.id}">Remove</button>` : ''}
-      </div>
+      <div class="row3"></div>
     `;
+
+    const { amountPaid, balance, status } = computeInvoicePaymentStatus(inv);
+    const badgeLabel = status === 'paid' ? '✓ Paid' : status === 'partial' ? 'Partial' : 'Unpaid';
+    const summaryText = status === 'unpaid'
+      ? `Balance ${fmt(inv.total)}`
+      : status === 'paid'
+        ? `Paid in full`
+        : `Paid ${fmt(amountPaid)} · Balance ${fmt(balance)}`;
+
+    const row3 = div.querySelector('.row3');
+    row3.innerHTML = `
+      <span class="payment-badge ${status}">${badgeLabel}</span>
+      <span class="payment-summary">${summaryText}</span>
+      ${balance > 0.005 ? `<button type="button" class="record-payment-btn" data-id="${inv.id}">+ Record Payment</button>` : ''}
+    `;
+
+    if(inv.payments && inv.payments.length > 0){
+      const history = document.createElement('div');
+      history.className = 'payment-history';
+      history.innerHTML = inv.payments.map(p => `
+        <div class="payment-history-row" data-payment-id="${p.id}" data-invoice-id="${inv.id}">
+          <span class="amt">${fmt(p.amount)}</span>
+          <span>${dateStrFromTs(p.ts)}</span>
+          ${p.note ? `<span class="note">${escapeHtml(p.note)}</span>` : ''}
+          ${p.proof ? (isImageAttachment(p.proofType)
+            ? `<img class="payment-thumb" src="${p.proof}" data-payment-id="${p.id}" data-invoice-id="${inv.id}" alt="Payment proof thumbnail">`
+            : `<button type="button" class="payment-doc-btn" data-payment-id="${p.id}" data-invoice-id="${inv.id}">📄 ${escapeHtml(p.proofName || 'Document')}</button>`
+          ) : ''}
+          <button type="button" class="payment-delete-btn" data-payment-id="${p.id}" data-invoice-id="${inv.id}" title="Delete this payment">×</button>
+        </div>
+      `).join('');
+      div.appendChild(history);
+    }
+
     list.appendChild(div);
   });
 }
@@ -1963,24 +2078,20 @@ document.getElementById('invoiceList').addEventListener('click', (e) => {
     return;
   }
 
-  const attachBtn = e.target.closest('.payment-attach-btn');
-  if(attachBtn){
-    pendingPaymentInvoiceId = attachBtn.dataset.id;
-    paymentProofInput.click();
+  const recordBtn = e.target.closest('.record-payment-btn');
+  if(recordBtn){
+    openPaymentModal(recordBtn.dataset.id);
     return;
   }
 
-  const removeBtn = e.target.closest('.payment-remove-btn');
-  if(removeBtn){
-    const inv = invoices.find(i => i.id === removeBtn.dataset.id);
-    if(inv && confirm('Remove payment proof? This invoice will show as unpaid again.')){
-      inv.paymentReceipt = null;
-      inv.paymentReceiptType = null;
-      inv.paymentReceiptName = null;
-      inv.paidAt = null;
+  const deleteBtn = e.target.closest('.payment-delete-btn');
+  if(deleteBtn){
+    const inv = invoices.find(i => i.id === deleteBtn.dataset.invoiceId);
+    if(inv && confirm('Delete this payment record? This cannot be undone.')){
+      inv.payments = inv.payments.filter(p => p.id !== deleteBtn.dataset.paymentId);
       saveInvoices();
       renderInvoiceList();
-      showToast('Payment proof removed');
+      showToast('Payment record deleted');
     }
     return;
   }
@@ -1994,38 +2105,114 @@ document.getElementById('invoiceList').addEventListener('click', (e) => {
 
   const paymentDocBtn = e.target.closest('.payment-doc-btn');
   if(paymentDocBtn){
-    const inv = invoices.find(i => i.id === paymentDocBtn.dataset.id);
-    if(inv && inv.paymentReceipt) openAttachment(inv.paymentReceipt);
+    const inv = invoices.find(i => i.id === paymentDocBtn.dataset.invoiceId);
+    const payment = inv && inv.payments.find(p => p.id === paymentDocBtn.dataset.paymentId);
+    if(payment && payment.proof) openAttachment(payment.proof);
   }
 });
 
-let pendingPaymentInvoiceId = null;
-const paymentProofInput = document.getElementById('paymentProofInput');
+// ── Record Payment modal ─────────────────────────────────────────────────
 
-paymentProofInput.addEventListener('change', () => {
-  const file = paymentProofInput.files[0];
-  const invoiceId = pendingPaymentInvoiceId;
-  paymentProofInput.value = '';
-  if(!file || !invoiceId) return;
+let paymentModalInvoiceId = null;
+let pendingPaymentProof = null; // { dataUrl, type, name } | null
 
+const paymentModal = document.getElementById('paymentModal');
+const paymentAmountInput = document.getElementById('paymentAmount');
+const paymentNoteInput = document.getElementById('paymentNote');
+const paymentModalProofInput = document.getElementById('paymentModalProofInput');
+const paymentModalProofPreview = document.getElementById('paymentModalProofPreview');
+const paymentModalProofImg = document.getElementById('paymentModalProofImg');
+const paymentModalProofDoc = document.getElementById('paymentModalProofDoc');
+const paymentModalProofName = document.getElementById('paymentModalProofName');
+
+function clearPaymentModalProof(){
+  pendingPaymentProof = null;
+  paymentModalProofInput.value = '';
+  paymentModalProofPreview.style.display = 'none';
+  paymentModalProofImg.style.display = 'none';
+  paymentModalProofImg.src = '';
+  paymentModalProofDoc.style.display = 'none';
+}
+
+function openPaymentModal(invoiceId){
+  const inv = invoices.find(i => i.id === invoiceId);
+  if(!inv) return;
+
+  paymentModalInvoiceId = invoiceId;
+  const { balance } = computeInvoicePaymentStatus(inv);
+  document.getElementById('paymentModalInfo').textContent =
+    `${inv.invoiceNo} — ${inv.client} · Balance ${fmt(balance)} of ${fmt(inv.total)}`;
+  paymentAmountInput.value = balance.toFixed(2);
+  paymentNoteInput.value = '';
+  clearPaymentModalProof();
+  paymentModal.classList.add('show');
+}
+
+function closePaymentModal(){
+  paymentModal.classList.remove('show');
+  paymentModalInvoiceId = null;
+}
+
+document.getElementById('btnPaymentModalProof').addEventListener('click', () => paymentModalProofInput.click());
+document.getElementById('btnRemovePaymentModalProof').addEventListener('click', clearPaymentModalProof);
+
+paymentModalProofInput.addEventListener('change', () => {
+  const file = paymentModalProofInput.files[0];
+  if(!file) return;
   attachFile(file, (result) => {
-    const inv = invoices.find(i => i.id === invoiceId);
-    if(!inv) return;
-    const original = { paymentReceipt: inv.paymentReceipt, paymentReceiptType: inv.paymentReceiptType, paymentReceiptName: inv.paymentReceiptName, paidAt: inv.paidAt };
-    inv.paymentReceipt = result.dataUrl;
-    inv.paymentReceiptType = result.type;
-    inv.paymentReceiptName = result.name;
-    inv.paidAt = inv.paidAt || Date.now();
-
-    if(!saveInvoices()){
-      Object.assign(inv, original);
-      showToast('Storage full — try a smaller file or delete old invoices');
-      return;
+    pendingPaymentProof = result;
+    paymentModalProofPreview.style.display = 'flex';
+    if(isImageAttachment(result.type)){
+      paymentModalProofImg.src = result.dataUrl;
+      paymentModalProofImg.style.display = 'block';
+      paymentModalProofDoc.style.display = 'none';
+    }else{
+      paymentModalProofImg.style.display = 'none';
+      paymentModalProofName.textContent = result.name;
+      paymentModalProofDoc.style.display = 'flex';
     }
-
-    renderInvoiceList();
-    showToast('Payment proof attached — marked as paid');
   });
+});
+
+document.getElementById('btnCancelPayment').addEventListener('click', closePaymentModal);
+paymentModal.addEventListener('click', (e) => {
+  if(e.target === paymentModal) closePaymentModal();
+});
+
+document.getElementById('btnSavePayment').addEventListener('click', () => {
+  const inv = invoices.find(i => i.id === paymentModalInvoiceId);
+  if(!inv) return;
+
+  const amount = parseFloat(paymentAmountInput.value);
+  if(!amount || amount <= 0){
+    showToast('Enter a valid payment amount');
+    return;
+  }
+
+  const note = paymentNoteInput.value.trim();
+  const payment = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    amount,
+    ts: Date.now(),
+    note,
+    proof: pendingPaymentProof ? pendingPaymentProof.dataUrl : null,
+    proofType: pendingPaymentProof ? pendingPaymentProof.type : null,
+    proofName: pendingPaymentProof ? pendingPaymentProof.name : null
+  };
+
+  inv.payments = inv.payments || [];
+  inv.payments.push(payment);
+
+  if(!saveInvoices()){
+    inv.payments.pop();
+    showToast('Storage full — try a smaller file or delete old invoices');
+    return;
+  }
+
+  const { status } = computeInvoicePaymentStatus(inv);
+  closePaymentModal();
+  renderInvoiceList();
+  showToast(status === 'paid' ? 'Payment recorded — invoice fully paid' : 'Payment recorded');
 });
 
 function printInvoice(id){
@@ -2038,7 +2225,16 @@ function printInvoice(id){
   document.getElementById('printInvoiceNo').textContent = inv.invoiceNo;
   document.getElementById('printInvoiceDate').textContent = dateStrFromTs(inv.ts);
   document.getElementById('printInvoiceClient').textContent = inv.client;
-  document.getElementById('printPaidBadge').style.display = inv.paymentReceipt ? 'inline-block' : 'none';
+
+  const { amountPaid, balance, status } = computeInvoicePaymentStatus(inv);
+  const badge = document.getElementById('printPaidBadge');
+  if(status === 'unpaid'){
+    badge.style.display = 'none';
+  }else{
+    badge.style.display = 'inline-block';
+    badge.textContent = status === 'paid' ? 'PAID' : 'PARTIALLY PAID';
+    badge.classList.toggle('partial', status === 'partial');
+  }
 
   document.getElementById('printInvoiceItems').innerHTML = inv.items.map(i => `
     <tr>
@@ -2057,6 +2253,12 @@ function printInvoice(id){
     totalsHtml += `<div class="row"><span>VAT (${inv.vatRate}%)</span><span>${fmt(inv.vatAmount)}</span></div>`;
   }
   totalsHtml += `<div class="row grand"><span>Total</span><span>${fmt(inv.total)}</span></div>`;
+  if(status !== 'unpaid'){
+    totalsHtml += `<div class="row"><span>Paid</span><span>${fmt(amountPaid)}</span></div>`;
+  }
+  if(balance > 0.005){
+    totalsHtml += `<div class="row" style="color:#a4462c;font-weight:700;"><span>Balance Due</span><span>${fmt(balance)}</span></div>`;
+  }
   document.getElementById('printInvoiceTotals').innerHTML = totalsHtml;
 
   document.getElementById('printInvoiceNotes').textContent = inv.notes || '';
@@ -2087,7 +2289,7 @@ document.getElementById('btnPrintStatement').addEventListener('click', () => {
 
   const clientInvoices = invoices.filter(i => i.client === client).sort((a, b) => a.ts - b.ts);
   const total = clientInvoices.reduce((sum, i) => sum + i.total, 0);
-  const outstanding = clientInvoices.reduce((sum, i) => sum + (i.paymentReceipt ? 0 : i.total), 0);
+  const outstanding = clientInvoices.reduce((sum, i) => sum + computeInvoicePaymentStatus(i).balance, 0);
 
   document.getElementById('stmtCompanyName').textContent = COMPANY.name;
   document.getElementById('stmtCompanyInfo').innerHTML =
@@ -2097,6 +2299,9 @@ document.getElementById('btnPrintStatement').addEventListener('click', () => {
 
   document.getElementById('stmtInvoiceRows').innerHTML = clientInvoices.map(inv => {
     const vehicles = [...new Set(inv.items.map(i => i.vehicle).filter(Boolean))].join(', ');
+    const { status } = computeInvoicePaymentStatus(inv);
+    const statusLabel = status === 'paid' ? 'Paid' : status === 'partial' ? 'Partial' : 'Unpaid';
+    const statusColor = status === 'paid' ? '#2c4d3c' : status === 'partial' ? '#8a5f24' : '#a4462c';
     return `
       <tr>
         <td>${escapeHtml(inv.invoiceNo)}</td>
@@ -2104,7 +2309,7 @@ document.getElementById('btnPrintStatement').addEventListener('click', () => {
         <td>${escapeHtml(vehicles)}</td>
         <td style="text-align:right;">${inv.items.length}</td>
         <td style="text-align:right;font-weight:600;">${fmt(inv.total)}</td>
-        <td style="text-align:right;color:${inv.paymentReceipt ? '#2c4d3c' : '#a4462c'};font-weight:600;">${inv.paymentReceipt ? 'Paid' : 'Unpaid'}</td>
+        <td style="text-align:right;color:${statusColor};font-weight:600;">${statusLabel}</td>
       </tr>
     `;
   }).join('');
