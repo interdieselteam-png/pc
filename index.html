@@ -281,6 +281,14 @@
     /* display:none (not visibility:hidden) so hidden content doesn't still
        occupy layout height and spill onto a spurious blank second page. */
     body > *:not(.print-doc){display:none;}
+    /* Most browsers' print dialog defaults "Background graphics" to OFF,
+       which silently strips every background-color here (accent bar, PAID
+       badge, totals boxes, alternating rows) unless forced like this. */
+    .print-doc, .print-doc *{
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      color-adjust: exact;
+    }
     .print-doc{
       display:block;position:relative;padding:34px 28px 28px;
       border:1px solid #d8d2c2;
