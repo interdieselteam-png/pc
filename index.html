@@ -233,6 +233,19 @@
     font-size:11px;text-transform:uppercase;letter-spacing:0.5px;cursor:pointer;
     text-decoration:underline;
   }
+  .doc-preview{
+    display:flex;align-items:center;gap:6px;font-family:ui-monospace,monospace;
+    font-size:12px;color:var(--ink-soft);max-width:220px;
+  }
+  .doc-preview .doc-name{
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .receipt-doc-btn, .payment-doc-btn{
+    background:none;border:1px solid var(--rule);border-radius:2px;cursor:pointer;
+    font-family:ui-monospace,monospace;font-size:10px;color:var(--ink-soft);
+    padding:3px 8px;max-width:130px;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;flex-shrink:0;
+  }
 
   .lightbox{
     position:fixed;inset:0;background:rgba(0,0,0,0.85);display:none;
@@ -575,10 +588,11 @@
 
     <div class="receipt-field">
       <label style="display:block;font-family:ui-monospace,monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink-soft);margin-bottom:5px;">Receipt</label>
-      <button type="button" class="receipt-btn" id="btnReceipt">📷 Snap receipt</button>
-      <input type="file" id="fReceipt" accept="image/*" capture="environment" style="display:none;">
+      <button type="button" class="receipt-btn" id="btnReceipt">📎 Attach receipt</button>
+      <input type="file" id="fReceipt" accept="image/*,application/pdf,.doc,.docx" capture="environment" style="display:none;">
       <div class="receipt-preview" id="receiptPreview" style="display:none;">
-        <img id="receiptPreviewImg" alt="Receipt preview">
+        <img id="receiptPreviewImg" alt="Receipt preview" style="display:none;">
+        <div class="doc-preview" id="receiptPreviewDoc" style="display:none;">📄 <span class="doc-name" id="receiptPreviewName"></span></div>
         <button type="button" id="btnRemoveReceipt">Remove</button>
       </div>
     </div>
@@ -665,7 +679,7 @@
 
   <div id="invoiceList"></div>
   <div class="empty" id="invoiceEmptyState" style="display:none;">No invoices yet. Create your first one above.</div>
-  <input type="file" id="paymentProofInput" accept="image/*" capture="environment" style="display:none;">
+  <input type="file" id="paymentProofInput" accept="image/*,application/pdf,.doc,.docx" capture="environment" style="display:none;">
 </main>
 
 <div class="toast" id="toast"></div>
@@ -806,6 +820,8 @@ function getGoogleApiKey(){ return localStorage.getItem('google-api-key') || '';
 let currentType = 'out';
 let entries = [];
 let pendingReceipt = null;
+let pendingReceiptType = null;
+let pendingReceiptName = null;
 let editingId = null;
 let expandedMonths = new Set();
 let monthsInitialized = false;
@@ -821,6 +837,8 @@ const btnReceipt = document.getElementById('btnReceipt');
 const fReceipt = document.getElementById('fReceipt');
 const receiptPreview = document.getElementById('receiptPreview');
 const receiptPreviewImg = document.getElementById('receiptPreviewImg');
+const receiptPreviewDoc = document.getElementById('receiptPreviewDoc');
+const receiptPreviewName = document.getElementById('receiptPreviewName');
 const btnRemoveReceipt = document.getElementById('btnRemoveReceipt');
 const lightbox = document.getElementById('lightbox');
 const lightboxImg = document.getElementById('lightboxImg');
@@ -957,7 +975,10 @@ function render(){
           <button class="delete-btn" data-id="${e.id}" aria-label="Delete entry" title="Delete entry">×</button>
         </div>
         <div class="sub">
-          ${e.receipt ? `<img class="receipt-thumb" src="${e.receipt}" data-id="${e.id}" alt="Receipt thumbnail">` : ''}
+          ${e.receipt ? (isImageAttachment(e.receiptType)
+            ? `<img class="receipt-thumb" src="${e.receipt}" data-id="${e.id}" alt="Receipt thumbnail">`
+            : `<button type="button" class="receipt-doc-btn" data-id="${e.id}">📄 ${escapeHtml(e.receiptName || 'Document')}</button>`
+          ) : ''}
           <span>${dateStr}</span>
         </div>
         ${e.note ? `<div class="note">"${escapeHtml(e.note)}"</div>` : ''}
@@ -1028,13 +1049,11 @@ function startEdit(id){
 
   if(entry.receipt){
     pendingReceipt = entry.receipt;
-    receiptPreviewImg.src = entry.receipt;
-    receiptPreview.style.display = 'flex';
+    pendingReceiptType = entry.receiptType || 'image/jpeg';
+    pendingReceiptName = entry.receiptName || null;
+    showReceiptPreview(entry.receipt, pendingReceiptType, pendingReceiptName);
   }else{
-    pendingReceipt = null;
-    fReceipt.value = '';
-    receiptPreview.style.display = 'none';
-    receiptPreviewImg.src = '';
+    clearPendingReceipt();
   }
 
   btnSave.textContent = 'Update Entry';
@@ -1069,7 +1088,7 @@ document.getElementById('btnSave').addEventListener('click', () => {
     const original = entries[idx];
     const ts = combineDateAndTime(dateStr, original.ts);
     expandedMonths.add(monthKeyFromTs(ts));
-    entries[idx] = { ...original, type: currentType, amount, source, party, note, receipt: pendingReceipt, ts };
+    entries[idx] = { ...original, type: currentType, amount, source, party, note, receipt: pendingReceipt, receiptType: pendingReceiptType, receiptName: pendingReceiptName, ts };
 
     if(!saveEntries()){
       entries[idx] = original;
@@ -1093,6 +1112,8 @@ document.getElementById('btnSave').addEventListener('click', () => {
     party,
     note,
     receipt: pendingReceipt,
+    receiptType: pendingReceiptType,
+    receiptName: pendingReceiptName,
     ts: newTs
   });
   expandedMonths.add(monthKeyFromTs(newTs));
@@ -1144,6 +1165,12 @@ document.getElementById('entryList').addEventListener('click', (e) => {
   if(thumb){
     lightboxImg.src = thumb.src;
     lightbox.classList.add('show');
+    return;
+  }
+  const docBtn = e.target.closest('.receipt-doc-btn');
+  if(docBtn){
+    const entry = entries.find(en => en.id === docBtn.dataset.id);
+    if(entry && entry.receipt) openAttachment(entry.receipt);
   }
 });
 
@@ -1154,9 +1181,26 @@ lightbox.addEventListener('click', () => {
 
 function clearPendingReceipt(){
   pendingReceipt = null;
+  pendingReceiptType = null;
+  pendingReceiptName = null;
   fReceipt.value = '';
   receiptPreview.style.display = 'none';
+  receiptPreviewImg.style.display = 'none';
   receiptPreviewImg.src = '';
+  receiptPreviewDoc.style.display = 'none';
+}
+
+function showReceiptPreview(dataUrl, type, name){
+  receiptPreview.style.display = 'flex';
+  if(isImageAttachment(type)){
+    receiptPreviewImg.src = dataUrl;
+    receiptPreviewImg.style.display = 'block';
+    receiptPreviewDoc.style.display = 'none';
+  }else{
+    receiptPreviewImg.style.display = 'none';
+    receiptPreviewName.textContent = name || 'Document';
+    receiptPreviewDoc.style.display = 'flex';
+  }
 }
 
 btnReceipt.addEventListener('click', () => fReceipt.click());
@@ -1187,13 +1231,57 @@ function downscaleImageToDataURL(file, callback){
   reader.readAsDataURL(file);
 }
 
+const MAX_DOC_SIZE = 5 * 1024 * 1024; // 5MB — documents aren't compressed like photos are
+
+// Accepts an image (downscaled/compressed) or a document (PDF/Word, stored
+// as-is up to MAX_DOC_SIZE) and hands back { dataUrl, type, name }.
+function attachFile(file, callback){
+  if(file.type.startsWith('image/')){
+    downscaleImageToDataURL(file, (dataUrl) => {
+      callback({ dataUrl, type: 'image/jpeg', name: file.name });
+    });
+    return;
+  }
+
+  if(file.size > MAX_DOC_SIZE){
+    showToast('File too large — documents are limited to 5MB');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    callback({ dataUrl: reader.result, type: file.type || 'application/octet-stream', name: file.name });
+  };
+  reader.onerror = () => showToast('Could not read file');
+  reader.readAsDataURL(file);
+}
+
+function isImageAttachment(type){
+  return !type || type.startsWith('image/');
+}
+
+// Data URLs can't be opened directly in a new tab in most browsers (blocked
+// as a security measure), so convert to a Blob URL first.
+async function openAttachment(dataUrl){
+  try{
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, '_blank');
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  }catch(e){
+    showToast('Could not open document');
+  }
+}
+
 fReceipt.addEventListener('change', () => {
   const file = fReceipt.files[0];
   if(!file) return;
-  downscaleImageToDataURL(file, (dataUrl) => {
-    pendingReceipt = dataUrl;
-    receiptPreviewImg.src = pendingReceipt;
-    receiptPreview.style.display = 'flex';
+  attachFile(file, (result) => {
+    pendingReceipt = result.dataUrl;
+    pendingReceiptType = result.type;
+    pendingReceiptName = result.name;
+    showReceiptPreview(result.dataUrl, result.type, result.name);
   });
 });
 
@@ -1843,8 +1931,11 @@ function renderInvoiceList(){
       </div>
       <div class="row3">
         <span class="payment-badge ${inv.paymentReceipt ? 'paid' : 'unpaid'}">${inv.paymentReceipt ? '✓ Paid' : 'Unpaid'}</span>
-        ${inv.paymentReceipt ? `<img class="payment-thumb" src="${inv.paymentReceipt}" data-id="${inv.id}" alt="Payment proof thumbnail">` : ''}
-        <button type="button" class="payment-attach-btn" data-id="${inv.id}">${inv.paymentReceipt ? 'Replace proof' : '📷 Attach payment proof'}</button>
+        ${inv.paymentReceipt ? (isImageAttachment(inv.paymentReceiptType)
+          ? `<img class="payment-thumb" src="${inv.paymentReceipt}" data-id="${inv.id}" alt="Payment proof thumbnail">`
+          : `<button type="button" class="payment-doc-btn" data-id="${inv.id}">📄 ${escapeHtml(inv.paymentReceiptName || 'Document')}</button>`
+        ) : ''}
+        <button type="button" class="payment-attach-btn" data-id="${inv.id}">${inv.paymentReceipt ? 'Replace proof' : '📎 Attach payment proof'}</button>
         ${inv.paymentReceipt ? `<button type="button" class="payment-remove-btn danger" data-id="${inv.id}">Remove</button>` : ''}
       </div>
     `;
@@ -1884,6 +1975,8 @@ document.getElementById('invoiceList').addEventListener('click', (e) => {
     const inv = invoices.find(i => i.id === removeBtn.dataset.id);
     if(inv && confirm('Remove payment proof? This invoice will show as unpaid again.')){
       inv.paymentReceipt = null;
+      inv.paymentReceiptType = null;
+      inv.paymentReceiptName = null;
       inv.paidAt = null;
       saveInvoices();
       renderInvoiceList();
@@ -1896,6 +1989,13 @@ document.getElementById('invoiceList').addEventListener('click', (e) => {
   if(paymentThumb){
     lightboxImg.src = paymentThumb.src;
     lightbox.classList.add('show');
+    return;
+  }
+
+  const paymentDocBtn = e.target.closest('.payment-doc-btn');
+  if(paymentDocBtn){
+    const inv = invoices.find(i => i.id === paymentDocBtn.dataset.id);
+    if(inv && inv.paymentReceipt) openAttachment(inv.paymentReceipt);
   }
 });
 
@@ -1908,16 +2008,18 @@ paymentProofInput.addEventListener('change', () => {
   paymentProofInput.value = '';
   if(!file || !invoiceId) return;
 
-  downscaleImageToDataURL(file, (dataUrl) => {
+  attachFile(file, (result) => {
     const inv = invoices.find(i => i.id === invoiceId);
     if(!inv) return;
-    inv.paymentReceipt = dataUrl;
+    const original = { paymentReceipt: inv.paymentReceipt, paymentReceiptType: inv.paymentReceiptType, paymentReceiptName: inv.paymentReceiptName, paidAt: inv.paidAt };
+    inv.paymentReceipt = result.dataUrl;
+    inv.paymentReceiptType = result.type;
+    inv.paymentReceiptName = result.name;
     inv.paidAt = inv.paidAt || Date.now();
 
     if(!saveInvoices()){
-      inv.paymentReceipt = null;
-      inv.paidAt = null;
-      showToast('Storage full — try a smaller photo or delete old invoices');
+      Object.assign(inv, original);
+      showToast('Storage full — try a smaller file or delete old invoices');
       return;
     }
 
