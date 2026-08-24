@@ -66,8 +66,15 @@ The Invoices tab lets you build a GPS tracker installation invoice:
 - **Client statements**: below the invoice list, a dropdown (populated from
   the distinct client names across all saved invoices) plus **Print
   Statement** generates a one-page summary of every invoice for that
-  client — invoice #, date, vehicles, item count, amount — with an
-  invoice count and grand total at the bottom.
+  client — invoice #, date, vehicles, item count, amount, and payment
+  status per row — with an invoice count, total, and outstanding balance.
+- **Payment proof**: each invoice in the list shows a Paid/Unpaid badge.
+  Tapping **Attach payment proof** opens the camera (or file picker) right
+  from the list — no need to open the edit form. Attaching a photo *is*
+  what marks the invoice paid (there's no separate "mark as paid"
+  checkbox to forget); removing the photo reverts it to unpaid. The photo
+  is downscaled/compressed the same way ledger receipts are. Payment
+  status is invoice-only — it does not create or affect any Ledger entry.
 
 ## Google Sheets sync (optional)
 

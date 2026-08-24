@@ -345,6 +345,10 @@
     .print-doc .print-invoice-meta{text-align:right;font-family:ui-monospace,monospace;font-size:11px;}
     .print-doc .print-invoice-meta .print-eyebrow{color:#a4462c;font-weight:700;}
     .print-doc .print-invoice-meta .invoice-no{font-size:21px;font-weight:700;color:#2a2620;margin-top:2px;}
+    .print-doc .print-paid-badge{
+      display:inline-block;margin-top:8px;padding:3px 10px;background:#2c4d3c;color:#fff;
+      font-size:10px;font-weight:700;letter-spacing:1px;border-radius:3px;
+    }
     .print-doc .print-bill-to{margin-bottom:20px;}
     .print-doc .print-bill-to .label{
       font-family:ui-monospace,monospace;font-size:9px;text-transform:uppercase;
@@ -442,6 +446,26 @@
     letter-spacing:0.5px;text-decoration:underline;padding:0;
   }
   .invoice-entry .invoice-actions button.danger{color:var(--rust);}
+
+  .invoice-entry .row3{
+    display:flex;align-items:center;gap:10px;margin-top:8px;
+  }
+  .payment-badge{
+    font-family:ui-monospace,monospace;font-size:9px;text-transform:uppercase;
+    letter-spacing:0.5px;padding:2px 7px;border-radius:10px;flex-shrink:0;
+  }
+  .payment-badge.paid{background:var(--green);color:#fff;}
+  .payment-badge.unpaid{background:transparent;color:var(--ink-soft);border:1px solid var(--rule);}
+  .invoice-entry .payment-thumb{
+    width:28px;height:28px;object-fit:cover;border:1px solid var(--rule);
+    border-radius:2px;cursor:pointer;flex-shrink:0;
+  }
+  .invoice-entry .row3 button{
+    background:none;border:none;color:var(--green-deep);cursor:pointer;
+    font-family:ui-monospace,monospace;font-size:10px;text-transform:uppercase;
+    letter-spacing:0.5px;text-decoration:underline;padding:0;
+  }
+  .invoice-entry .row3 button.danger{color:var(--rust);}
 
   .statement-bar{
     display:flex;align-items:center;gap:12px;margin-bottom:14px;
@@ -641,6 +665,7 @@
 
   <div id="invoiceList"></div>
   <div class="empty" id="invoiceEmptyState" style="display:none;">No invoices yet. Create your first one above.</div>
+  <input type="file" id="paymentProofInput" accept="image/*" capture="environment" style="display:none;">
 </main>
 
 <div class="toast" id="toast"></div>
@@ -694,6 +719,7 @@
       <div class="print-eyebrow">Invoice</div>
       <div class="invoice-no" id="printInvoiceNo"></div>
       <div id="printInvoiceDate"></div>
+      <div class="print-paid-badge" id="printPaidBadge" style="display:none;">PAID</div>
     </div>
   </div>
 
@@ -741,7 +767,7 @@
 
   <table>
     <thead>
-      <tr><th>Invoice #</th><th>Date</th><th>Vehicles</th><th style="text-align:right;">Items</th><th style="text-align:right;">Amount</th></tr>
+      <tr><th>Invoice #</th><th>Date</th><th>Vehicles</th><th style="text-align:right;">Items</th><th style="text-align:right;">Amount</th><th style="text-align:right;">Status</th></tr>
     </thead>
     <tbody id="stmtInvoiceRows"></tbody>
   </table>
@@ -1137,10 +1163,7 @@ btnReceipt.addEventListener('click', () => fReceipt.click());
 
 btnRemoveReceipt.addEventListener('click', clearPendingReceipt);
 
-fReceipt.addEventListener('change', () => {
-  const file = fReceipt.files[0];
-  if(!file) return;
-
+function downscaleImageToDataURL(file, callback){
   const reader = new FileReader();
   reader.onload = () => {
     const img = new Image();
@@ -1156,14 +1179,22 @@ fReceipt.addEventListener('change', () => {
       canvas.width = width;
       canvas.height = height;
       canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      pendingReceipt = canvas.toDataURL('image/jpeg', 0.7);
-      receiptPreviewImg.src = pendingReceipt;
-      receiptPreview.style.display = 'flex';
+      callback(canvas.toDataURL('image/jpeg', 0.7));
     };
     img.src = reader.result;
   };
   reader.onerror = () => showToast('Could not read photo');
   reader.readAsDataURL(file);
+}
+
+fReceipt.addEventListener('change', () => {
+  const file = fReceipt.files[0];
+  if(!file) return;
+  downscaleImageToDataURL(file, (dataUrl) => {
+    pendingReceipt = dataUrl;
+    receiptPreviewImg.src = pendingReceipt;
+    receiptPreview.style.display = 'flex';
+  });
 });
 
 // ── Google Sheets sync ───────────────────────────────────────────────────
@@ -1810,6 +1841,12 @@ function renderInvoiceList(){
           <button type="button" class="inv-delete-btn danger" data-id="${inv.id}">Delete</button>
         </div>
       </div>
+      <div class="row3">
+        <span class="payment-badge ${inv.paymentReceipt ? 'paid' : 'unpaid'}">${inv.paymentReceipt ? '✓ Paid' : 'Unpaid'}</span>
+        ${inv.paymentReceipt ? `<img class="payment-thumb" src="${inv.paymentReceipt}" data-id="${inv.id}" alt="Payment proof thumbnail">` : ''}
+        <button type="button" class="payment-attach-btn" data-id="${inv.id}">${inv.paymentReceipt ? 'Replace proof' : '📷 Attach payment proof'}</button>
+        ${inv.paymentReceipt ? `<button type="button" class="payment-remove-btn danger" data-id="${inv.id}">Remove</button>` : ''}
+      </div>
     `;
     list.appendChild(div);
   });
@@ -1832,7 +1869,61 @@ document.getElementById('invoiceList').addEventListener('click', (e) => {
       renderInvoiceList();
       showToast('Invoice deleted');
     }
+    return;
   }
+
+  const attachBtn = e.target.closest('.payment-attach-btn');
+  if(attachBtn){
+    pendingPaymentInvoiceId = attachBtn.dataset.id;
+    paymentProofInput.click();
+    return;
+  }
+
+  const removeBtn = e.target.closest('.payment-remove-btn');
+  if(removeBtn){
+    const inv = invoices.find(i => i.id === removeBtn.dataset.id);
+    if(inv && confirm('Remove payment proof? This invoice will show as unpaid again.')){
+      inv.paymentReceipt = null;
+      inv.paidAt = null;
+      saveInvoices();
+      renderInvoiceList();
+      showToast('Payment proof removed');
+    }
+    return;
+  }
+
+  const paymentThumb = e.target.closest('.payment-thumb');
+  if(paymentThumb){
+    lightboxImg.src = paymentThumb.src;
+    lightbox.classList.add('show');
+  }
+});
+
+let pendingPaymentInvoiceId = null;
+const paymentProofInput = document.getElementById('paymentProofInput');
+
+paymentProofInput.addEventListener('change', () => {
+  const file = paymentProofInput.files[0];
+  const invoiceId = pendingPaymentInvoiceId;
+  paymentProofInput.value = '';
+  if(!file || !invoiceId) return;
+
+  downscaleImageToDataURL(file, (dataUrl) => {
+    const inv = invoices.find(i => i.id === invoiceId);
+    if(!inv) return;
+    inv.paymentReceipt = dataUrl;
+    inv.paidAt = inv.paidAt || Date.now();
+
+    if(!saveInvoices()){
+      inv.paymentReceipt = null;
+      inv.paidAt = null;
+      showToast('Storage full — try a smaller photo or delete old invoices');
+      return;
+    }
+
+    renderInvoiceList();
+    showToast('Payment proof attached — marked as paid');
+  });
 });
 
 function printInvoice(id){
@@ -1845,6 +1936,7 @@ function printInvoice(id){
   document.getElementById('printInvoiceNo').textContent = inv.invoiceNo;
   document.getElementById('printInvoiceDate').textContent = dateStrFromTs(inv.ts);
   document.getElementById('printInvoiceClient').textContent = inv.client;
+  document.getElementById('printPaidBadge').style.display = inv.paymentReceipt ? 'inline-block' : 'none';
 
   document.getElementById('printInvoiceItems').innerHTML = inv.items.map(i => `
     <tr>
@@ -1893,6 +1985,7 @@ document.getElementById('btnPrintStatement').addEventListener('click', () => {
 
   const clientInvoices = invoices.filter(i => i.client === client).sort((a, b) => a.ts - b.ts);
   const total = clientInvoices.reduce((sum, i) => sum + i.total, 0);
+  const outstanding = clientInvoices.reduce((sum, i) => sum + (i.paymentReceipt ? 0 : i.total), 0);
 
   document.getElementById('stmtCompanyName').textContent = COMPANY.name;
   document.getElementById('stmtCompanyInfo').innerHTML =
@@ -1909,13 +2002,16 @@ document.getElementById('btnPrintStatement').addEventListener('click', () => {
         <td>${escapeHtml(vehicles)}</td>
         <td style="text-align:right;">${inv.items.length}</td>
         <td style="text-align:right;font-weight:600;">${fmt(inv.total)}</td>
+        <td style="text-align:right;color:${inv.paymentReceipt ? '#2c4d3c' : '#a4462c'};font-weight:600;">${inv.paymentReceipt ? 'Paid' : 'Unpaid'}</td>
       </tr>
     `;
   }).join('');
 
   document.getElementById('stmtTotals').innerHTML = `
     <div class="row"><span>Invoices</span><span>${clientInvoices.length}</span></div>
-    <div class="row grand"><span>Total</span><span>${fmt(total)}</span></div>
+    <div class="row"><span>Total</span><span>${fmt(total)}</span></div>
+    <div class="row" style="color:${outstanding > 0 ? '#a4462c' : '#6b6455'};"><span>Outstanding</span><span>${fmt(outstanding)}</span></div>
+    <div class="row grand"><span>${outstanding > 0 ? 'Balance Due' : 'Fully Paid'}</span><span>${fmt(outstanding)}</span></div>
   `;
 
   showPrintDoc('clientStatementPrintArea');
