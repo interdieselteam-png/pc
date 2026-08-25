@@ -352,7 +352,12 @@
     }
     .print-doc .sign-line{flex:1;font-family:ui-monospace,monospace;font-size:9px;
       text-transform:uppercase;letter-spacing:0.5px;color:#6b6455;}
-    .print-doc .sign-line .line{border-bottom:1px solid #2a2620;height:36px;}
+    .print-doc .sign-line .line{
+      border-bottom:1px solid #2a2620;height:36px;
+      display:flex;align-items:flex-end;padding-bottom:4px;
+      font-family:'Georgia',serif;font-size:13px;color:#2a2620;
+      font-style:italic;text-transform:none;letter-spacing:normal;
+    }
 
     /* Invoice-specific print elements */
     .print-doc .print-company-header{
@@ -508,6 +513,10 @@
     background:none;border:none;color:var(--rust);cursor:pointer;font-size:12px;
     padding:0;flex-shrink:0;
   }
+  .payment-history-row .payment-receipt-btn{
+    color:var(--green-deep);font-family:ui-monospace,monospace;font-size:9px;
+    text-transform:uppercase;letter-spacing:0.5px;text-decoration:underline;
+  }
 
   .statement-bar{
     display:flex;align-items:center;gap:12px;margin-bottom:14px;
@@ -655,6 +664,11 @@
     </div>
 
     <div class="field">
+      <label>Prepared By</label>
+      <input type="text" id="preparedByInput" placeholder="Your name — shown on printed documents">
+    </div>
+
+    <div class="field">
       <label>Invoice #</label>
       <input type="text" id="invNumber" readonly>
     </div>
@@ -745,6 +759,10 @@
       <input type="number" id="paymentAmount" step="0.01" min="0.01">
     </div>
     <div class="field">
+      <label>Receipt No. (optional)</label>
+      <input type="text" id="paymentReceiptNo" placeholder="e.g. M-Pesa code or your own receipt number">
+    </div>
+    <div class="field">
       <label>Note (optional)</label>
       <input type="text" id="paymentNote" placeholder="e.g. M-Pesa part payment">
     </div>
@@ -772,7 +790,7 @@
   <div class="print-summary" id="printSummaryBox"></div>
   <div id="printMonths"></div>
   <div class="print-footer">
-    <div class="sign-line">Prepared by<div class="line"></div></div>
+    <div class="sign-line">Prepared by<div class="line" id="printPreparedByLine"></div></div>
     <div class="sign-line">Approved by<div class="line"></div></div>
   </div>
 </div>
@@ -811,7 +829,7 @@
   <div class="print-notes" id="printInvoiceNotes"></div>
 
   <div class="print-footer">
-    <div class="sign-line">Prepared by<div class="line"></div></div>
+    <div class="sign-line">Prepared by<div class="line" id="invoicePreparedByLine"></div></div>
     <div class="sign-line">Client signature<div class="line"></div></div>
   </div>
 </div>
@@ -846,7 +864,38 @@
   <div class="print-invoice-totals" id="stmtTotals"></div>
 
   <div class="print-footer">
-    <div class="sign-line">Prepared by<div class="line"></div></div>
+    <div class="sign-line">Prepared by<div class="line" id="stmtPreparedByLine"></div></div>
+    <div class="sign-line">Client signature<div class="line"></div></div>
+  </div>
+</div>
+
+<div id="receiptPrintArea" class="print-doc">
+  <div class="print-company-header">
+    <div style="display:flex;gap:12px;align-items:flex-start;">
+      <img id="rcptCompanyLogo" alt="Inter Diesel Works logo" style="width:48px;height:auto;">
+      <div>
+        <div class="company-name" id="rcptCompanyName">Inter Diesel Works LTD</div>
+        <div class="company-info" id="rcptCompanyInfo"></div>
+      </div>
+    </div>
+    <div class="print-invoice-meta">
+      <div class="print-eyebrow">Receipt</div>
+      <div class="invoice-no" id="rcptNo"></div>
+      <div id="rcptDate"></div>
+    </div>
+  </div>
+
+  <div class="print-bill-to">
+    <div class="label">Received From</div>
+    <div class="client-name" id="rcptClient"></div>
+  </div>
+
+  <div class="print-invoice-totals" id="rcptAmountBox" style="margin-left:0;width:auto;max-width:320px;"></div>
+
+  <div class="print-notes" id="rcptNotes"></div>
+
+  <div class="print-footer">
+    <div class="sign-line">Prepared by<div class="line" id="rcptPreparedByLine"></div></div>
     <div class="sign-line">Client signature<div class="line"></div></div>
   </div>
 </div>
@@ -1053,7 +1102,10 @@ function escapeHtml(s){
   return div.innerHTML;
 }
 
-const PRINT_DOC_IDS = ['printArea', 'invoicePrintArea', 'clientStatementPrintArea'];
+const PRINT_DOC_IDS = ['printArea', 'invoicePrintArea', 'clientStatementPrintArea', 'receiptPrintArea'];
+
+function getPreparedByName(){ return localStorage.getItem('prepared-by-name') || ''; }
+function setPreparedByName(name){ localStorage.setItem('prepared-by-name', name); }
 function showPrintDoc(activeId){
   PRINT_DOC_IDS.forEach(id => {
     document.getElementById(id).style.display = id === activeId ? '' : 'none';
@@ -1688,6 +1740,8 @@ document.getElementById('btnExportPdf').addEventListener('click', () => {
     </div>
   `).join('');
 
+  document.getElementById('printPreparedByLine').textContent = getPreparedByName();
+
   showPrintDoc('printArea');
   window.print();
 });
@@ -2043,11 +2097,13 @@ function renderInvoiceList(){
         <div class="payment-history-row" data-payment-id="${p.id}" data-invoice-id="${inv.id}">
           <span class="amt">${fmt(p.amount)}</span>
           <span>${dateStrFromTs(p.ts)}</span>
+          ${p.receiptNo ? `<span class="note">#${escapeHtml(p.receiptNo)}</span>` : ''}
           ${p.note ? `<span class="note">${escapeHtml(p.note)}</span>` : ''}
           ${p.proof ? (isImageAttachment(p.proofType)
             ? `<img class="payment-thumb" src="${p.proof}" data-payment-id="${p.id}" data-invoice-id="${inv.id}" alt="Payment proof thumbnail">`
             : `<button type="button" class="payment-doc-btn" data-payment-id="${p.id}" data-invoice-id="${inv.id}">📄 ${escapeHtml(p.proofName || 'Document')}</button>`
           ) : ''}
+          <button type="button" class="payment-receipt-btn" data-payment-id="${p.id}" data-invoice-id="${inv.id}" title="Print receipt for this payment">🧾 Receipt</button>
           <button type="button" class="payment-delete-btn" data-payment-id="${p.id}" data-invoice-id="${inv.id}" title="Delete this payment">×</button>
         </div>
       `).join('');
@@ -2108,6 +2164,12 @@ document.getElementById('invoiceList').addEventListener('click', (e) => {
     const inv = invoices.find(i => i.id === paymentDocBtn.dataset.invoiceId);
     const payment = inv && inv.payments.find(p => p.id === paymentDocBtn.dataset.paymentId);
     if(payment && payment.proof) openAttachment(payment.proof);
+    return;
+  }
+
+  const paymentReceiptBtn = e.target.closest('.payment-receipt-btn');
+  if(paymentReceiptBtn){
+    printReceipt(paymentReceiptBtn.dataset.invoiceId, paymentReceiptBtn.dataset.paymentId);
   }
 });
 
@@ -2143,6 +2205,7 @@ function openPaymentModal(invoiceId){
   document.getElementById('paymentModalInfo').textContent =
     `${inv.invoiceNo} — ${inv.client} · Balance ${fmt(balance)} of ${fmt(inv.total)}`;
   paymentAmountInput.value = balance.toFixed(2);
+  document.getElementById('paymentReceiptNo').value = '';
   paymentNoteInput.value = '';
   clearPaymentModalProof();
   paymentModal.classList.add('show');
@@ -2190,11 +2253,13 @@ document.getElementById('btnSavePayment').addEventListener('click', () => {
   }
 
   const note = paymentNoteInput.value.trim();
+  const receiptNo = document.getElementById('paymentReceiptNo').value.trim();
   const payment = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
     amount,
     ts: Date.now(),
     note,
+    receiptNo,
     proof: pendingPaymentProof ? pendingPaymentProof.dataUrl : null,
     proofType: pendingPaymentProof ? pendingPaymentProof.type : null,
     proofName: pendingPaymentProof ? pendingPaymentProof.name : null
@@ -2262,8 +2327,35 @@ function printInvoice(id){
   document.getElementById('printInvoiceTotals').innerHTML = totalsHtml;
 
   document.getElementById('printInvoiceNotes').textContent = inv.notes || '';
+  document.getElementById('invoicePreparedByLine').textContent = getPreparedByName();
 
   showPrintDoc('invoicePrintArea');
+  window.print();
+}
+
+function printReceipt(invoiceId, paymentId){
+  const inv = invoices.find(i => i.id === invoiceId);
+  if(!inv) return;
+  const payment = (inv.payments || []).find(p => p.id === paymentId);
+  if(!payment) return;
+
+  document.getElementById('rcptCompanyName').textContent = COMPANY.name;
+  document.getElementById('rcptCompanyInfo').innerHTML =
+    `${escapeHtml(COMPANY.address)}<br>${escapeHtml(COMPANY.phone)}<br>${escapeHtml(COMPANY.email)}`;
+  document.getElementById('rcptNo').textContent =
+    payment.receiptNo || ('PMT-' + payment.id.slice(-6).toUpperCase());
+  document.getElementById('rcptDate').textContent = dateStrFromTs(payment.ts);
+  document.getElementById('rcptClient').textContent = inv.client;
+
+  document.getElementById('rcptAmountBox').innerHTML = `
+    <div class="row"><span>For Invoice</span><span>${escapeHtml(inv.invoiceNo)}</span></div>
+    <div class="row grand"><span>Amount Received</span><span>${fmt(payment.amount)}</span></div>
+  `;
+
+  document.getElementById('rcptNotes').textContent = payment.note || '';
+  document.getElementById('rcptPreparedByLine').textContent = getPreparedByName();
+
+  showPrintDoc('receiptPrintArea');
   window.print();
 }
 
@@ -2321,6 +2413,8 @@ document.getElementById('btnPrintStatement').addEventListener('click', () => {
     <div class="row grand"><span>${outstanding > 0 ? 'Balance Due' : 'Fully Paid'}</span><span>${fmt(outstanding)}</span></div>
   `;
 
+  document.getElementById('stmtPreparedByLine').textContent = getPreparedByName();
+
   showPrintDoc('clientStatementPrintArea');
   window.print();
 });
@@ -2337,6 +2431,11 @@ document.getElementById('tabBtnInvoices').addEventListener('click', () => switch
 document.getElementById('companyLogo').src = COMPANY_LOGO;
 document.getElementById('printCompanyLogo').src = COMPANY_LOGO;
 document.getElementById('stmtCompanyLogo').src = COMPANY_LOGO;
+document.getElementById('rcptCompanyLogo').src = COMPANY_LOGO;
+
+const preparedByInput = document.getElementById('preparedByInput');
+preparedByInput.value = getPreparedByName();
+preparedByInput.addEventListener('input', () => setPreparedByName(preparedByInput.value));
 
 resetInvoiceForm();
 loadInvoices();

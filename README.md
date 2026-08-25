@@ -84,6 +84,26 @@ The Invoices tab lets you build a GPS tracker installation invoice:
 - The Ledger's own **Receipt** field on each entry works the same way as
   payment proof — attach a photo or a document (PDF/Word), not just a
   camera photo.
+- **Generate Receipt**: each recorded payment has its own **🧾 Receipt**
+  button that prints a standalone Receipt document (separate from the
+  Invoice) showing the amount received, the invoice it applies to, the
+  client, and who prepared it — useful to hand the client proof of a
+  specific payment without reprinting the whole invoice. Its receipt
+  number comes from the payment's **Receipt No.** field (see below), or
+  falls back to an auto-generated one if left blank.
+- **Receipt No.**: when recording a payment, an optional text field lets
+  you capture a reference for that payment (an M-Pesa transaction code, a
+  bank slip number, or your own receipt numbering) — it's saved with the
+  payment and shown on the payment history row and on the printed Receipt.
+
+## Prepared by
+
+A **Prepared by** text input (above the Invoice form) lets you type the
+name of whoever is preparing documents. It's saved in `localStorage` and
+automatically printed on every document — the ledger statement, invoices,
+client statements, and payment receipts — in place of a blank signature
+line, so the printed page shows who prepared it as well as a line for a
+signature.
 
 ## Google Sheets sync (optional)
 
